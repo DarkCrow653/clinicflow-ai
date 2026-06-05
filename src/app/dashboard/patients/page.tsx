@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
@@ -112,17 +113,19 @@ export default function PatientsPage() {
 
       <div className="space-y-4">
         {patients.map((patient) => (
-          <div
-            key={patient.id}
-            className="rounded-2xl border bg-white shadow-sm p-4"
-          >
-            <p className="font-bold">
-              {patient.full_name}
-            </p>
+  <Link
+    href={`/dashboard/patients/${patient.id}`}
+    key={patient.id}
+  >
+    <div className="rounded-2xl border bg-white shadow-sm p-4 hover:bg-gray-50 cursor-pointer">
+      <p className="font-bold">
+        {patient.full_name}
+      </p>
 
-            <p>{patient.phone}</p>
-          </div>
-        ))}
+      <p>{patient.phone}</p>
+    </div>
+  </Link>
+))}
       </div>
     </div>
   )

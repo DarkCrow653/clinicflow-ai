@@ -175,23 +175,30 @@ export default function AppointmentsPage() {
             className="rounded-2xl border bg-white p-4 shadow-sm"
           >
             <p className="font-bold">
-              {
-                appointment.patients
-                  ?.full_name
-              }
-            </p>
+  {appointment.patients?.full_name}
+</p>
 
-            <p>
-              {new Date(
-                appointment.appointment_date
-              ).toLocaleString()}
-            </p>
+<p>
+  {new Date(
+    appointment.appointment_date
+  ).toLocaleString()}
+</p>
 
-            <p>
-              Estado:
-              {" "}
-              {appointment.status}
-            </p>
+<div className="mt-2">
+  <span
+    className={`rounded-full px-3 py-1 text-sm ${
+      appointment.status === "confirmed"
+        ? "bg-green-100 text-green-700"
+        : appointment.status === "completed"
+        ? "bg-blue-100 text-blue-700"
+        : appointment.status === "cancelled"
+        ? "bg-red-100 text-red-700"
+        : "bg-yellow-100 text-yellow-700"
+    }`}
+  >
+    {appointment.status}
+  </span>
+</div>
           </div>
         ))}
       </div>
