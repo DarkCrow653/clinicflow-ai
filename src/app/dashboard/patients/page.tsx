@@ -74,6 +74,11 @@ export default function PatientsPage() {
 
   return (
     <div className="space-y-8 p-10">
+       
+      <h1 className="text-red-500 text-4xl">
+        VERSION NUEVA
+      </h1>
+
       <div>
         <h1 className="text-4xl font-bold">
           Pacientes
