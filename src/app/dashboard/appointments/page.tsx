@@ -9,208 +9,321 @@ type Patient = {
   full_name: string
 }
 
+type AppointmentType = {
+  id: string
+  name: string
+  price: number
+  duration_minutes: number
+}
+
 type Appointment = {
   id: string
   appointment_date: string
   status: string
-  patients: {
-    full_name: string
-  }
+  price: number
+  patients: { full_name: string }
+  appointment_types: { name: string; price: number } | null
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pendiente",
+  confirmed: "Confirmada",
+  completed: "Completada",
+  cancelled: "Cancelada",
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  confirmed: "bg-blue-50 text-blue-700 border-blue-200",
+  completed: "bg-green-50 text-green-700 border-green-200",
+  cancelled: "bg-red-50 text-red-700 border-red-200",
+}
+
+const STATUS_FILTERS = ["todas", "pending", "confirmed", "completed", "cancelled"]
+
 export default function AppointmentsPage() {
-  const [patients, setPatients] =
-    useState<Patient[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [services, setServices] = useState<AppointmentType[]>([]) // 👈 NUEVO
+  const [patientId, setPatientId] = useState("")
+  const [date, setDate] = useState("")
+  const [clinicId, setClinicId] = useState("")
+  const [activeFilter, setActiveFilter] = useState("todas")
 
-  const [appointments, setAppointments] =
-    useState<Appointment[]>([])
+  // 👇 NUEVO — servicio seleccionado
+  const [selectedServiceId, setSelectedServiceId] = useState("")
+  const [selectedPrice, setSelectedPrice] = useState(0)
+  const [selectedDuration, setSelectedDuration] = useState(0)
 
-  const [patientId, setPatientId] =
-    useState("")
+  const filteredAppointments = appointments.filter((a) =>
+    activeFilter === "todas" ? true : a.status === activeFilter
+  )
 
-  const [date, setDate] =
-    useState("")
+  const groupedByDate = filteredAppointments.reduce<Record<string, Appointment[]>>(
+    (acc, apt) => {
+      const day = new Date(apt.appointment_date).toLocaleDateString("es-ES", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+      if (!acc[day]) acc[day] = []
+      acc[day].push(apt)
+      return acc
+    },
+    {}
+  )
 
-  const [clinicId, setClinicId] =
-    useState("")
-
-    const calendarEvents =
-  appointments.map((appointment) => ({
-    title:
-      appointment.patients?.full_name ||
-      "Paciente",
-    date: appointment.appointment_date,
+  const calendarEvents = appointments.map((apt) => ({
+    title: apt.patients?.full_name || "Paciente",
+    date: apt.appointment_date,
+    status: apt.status,
   }))
 
   useEffect(() => {
-    loadData()
+    loadAppointments()
   }, [])
 
-  const loadData = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
+  const loadAppointments = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: profile } =
-      await supabase
-        .from("profiles")
-        .select("clinic_id")
-        .eq("id", user.id)
-        .single()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("clinic_id")
+      .eq("id", user.id)
+      .single()
 
     if (!profile) return
-
     setClinicId(profile.clinic_id)
 
-    const { data: patientsData } =
-      await supabase
-        .from("patients")
-        .select("*")
-        .eq("clinic_id", profile.clinic_id)
+    const { data: patientsData } = await supabase
+      .from("patients")
+      .select("*")
+      .eq("clinic_id", profile.clinic_id)
 
-    if (patientsData) {
-      setPatients(patientsData)
-    }
+    if (patientsData) setPatients(patientsData)
 
-    const { data: appointmentsData } =
-      await supabase
-        .from("appointments")
-        .select(`
-          *,
-          patients (
-            full_name
-          )
-        `)
-        .eq("clinic_id", profile.clinic_id)
-        .order("appointment_date", {
-          ascending: true,
-        })
+    // 👇 NUEVO — cargar servicios
+    const { data: servicesData } = await supabase
+      .from("appointment_types")
+      .select("*")
+      .eq("clinic_id", profile.clinic_id)
+      .order("name", { ascending: true })
 
-    if (appointmentsData) {
-      setAppointments(
-        appointmentsData as Appointment[]
-      )
+    if (servicesData) setServices(servicesData)
+
+    const { data: appointmentsData } = await supabase
+      .from("appointments")
+      .select(`*, patients (full_name), appointment_types (name, price)`)
+      .eq("clinic_id", profile.clinic_id)
+      .order("appointment_date", { ascending: true })
+
+    if (appointmentsData) setAppointments(appointmentsData as Appointment[])
+  }
+
+  // 👇 NUEVO — al seleccionar servicio, carga precio y duración automáticamente
+  const handleServiceChange = (serviceId: string) => {
+    setSelectedServiceId(serviceId)
+    const service = services.find((s) => s.id === serviceId)
+    if (service) {
+      setSelectedPrice(service.price)
+      setSelectedDuration(service.duration_minutes)
+    } else {
+      setSelectedPrice(0)
+      setSelectedDuration(0)
     }
   }
 
-  const createAppointment =
-    async () => {
-      if (!patientId || !date) return
+  const createAppointment = async () => {
+    if (!patientId || !date || !selectedServiceId) return
 
-      await supabase
-        .from("appointments")
-        .insert({
-          clinic_id: clinicId,
-          patient_id: patientId,
-          appointment_date: date,
-        })
+    await supabase.from("appointments").insert({
+      clinic_id: clinicId,
+      patient_id: patientId,
+      appointment_date: date,
+      status: "pending",
+      appointment_type_id: selectedServiceId,
+      price: selectedPrice,
+    })
 
-      setPatientId("")
-      setDate("")
+    setPatientId("")
+    setDate("")
+    setSelectedServiceId("")
+    setSelectedPrice(0)
+    setSelectedDuration(0)
+    loadAppointments()
+  }
 
-      loadData()
-    }
+  const updateStatus = async (appointmentId: string, status: string) => {
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status })
+      .eq("id", appointmentId)
+
+    if (error) { alert(error.message); return }
+    loadAppointments()
+  }
+
+  const deleteAppointment = async (appointmentId: string) => {
+    const confirm = window.confirm("¿Eliminar esta cita?")
+    if (!confirm) return
+
+    const { error } = await supabase
+      .from("appointments")
+      .delete()
+      .eq("id", appointmentId)
+
+    if (error) { alert(error.message); return }
+    loadAppointments()
+  }
 
   return (
     <div className="space-y-8 p-10">
       <div>
-        <h1 className="text-4xl font-bold">
-          Citas
-        </h1>
+        <h1 className="text-4xl font-bold">Citas</h1>
       </div>
 
+      {/* FORMULARIO */}
       <div className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-bold">
-          Nueva cita
-        </h2>
+        <h2 className="text-2xl font-bold">Nueva cita</h2>
 
         <select
           className="w-full rounded border p-2"
           value={patientId}
-          onChange={(e) =>
-            setPatientId(e.target.value)
-          }
+          onChange={(e) => setPatientId(e.target.value)}
         >
-          <option value="">
-            Selecciona paciente
-          </option>
-
+          <option value="">Selecciona paciente</option>
           {patients.map((patient) => (
-            <option
-              key={patient.id}
-              value={patient.id}
-            >
+            <option key={patient.id} value={patient.id}>
               {patient.full_name}
             </option>
           ))}
         </select>
 
+        {/* 👇 NUEVO — selector de servicio */}
+        <select
+          className="w-full rounded border p-2"
+          value={selectedServiceId}
+          onChange={(e) => handleServiceChange(e.target.value)}
+        >
+          <option value="">Selecciona servicio</option>
+          {services.map((service) => (
+            <option key={service.id} value={service.id}>
+              {service.name} — ${service.price} · {service.duration_minutes} min
+            </option>
+          ))}
+        </select>
+
+        {/* 👇 NUEVO — info del servicio seleccionado */}
+        {selectedServiceId && (
+          <div className="rounded-xl border bg-gray-50 px-4 py-3 text-sm text-gray-600 flex gap-6">
+            <span>💰 Precio: <strong>${selectedPrice}</strong></span>
+            <span>⏱ Duración: <strong>{selectedDuration} min</strong></span>
+          </div>
+        )}
+
         <input
           type="datetime-local"
           className="w-full rounded border p-2"
           value={date}
-          onChange={(e) =>
-            setDate(e.target.value)
-          }
+          onChange={(e) => setDate(e.target.value)}
         />
 
         <button
           onClick={createAppointment}
-          className="rounded bg-black px-4 py-2 text-white"
+          disabled={!patientId || !date || !selectedServiceId}
+          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
         >
           Crear cita
         </button>
       </div>
 
+      {/* AGENDA */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold">
-          Agenda
-        </h2>
+        <h2 className="text-2xl font-bold">Agenda</h2>
 
-        {appointments.map((appointment) => (
-          <div
-            key={appointment.id}
-            className="rounded-2xl border bg-white p-4 shadow-sm"
-          >
-            <p className="font-bold">
-  {appointment.patients?.full_name}
-</p>
+        <div className="flex gap-2 flex-wrap">
+          {STATUS_FILTERS.map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setActiveFilter(filter)}
+              className={`rounded-full border px-4 py-1 text-sm capitalize transition ${
+                activeFilter === filter
+                  ? "bg-black text-white border-black"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {filter === "todas" ? "Todas" : STATUS_LABELS[filter]}
+            </button>
+          ))}
+        </div>
 
-<p>
-  {new Date(
-    appointment.appointment_date
-  ).toLocaleString()}
-</p>
+        {Object.keys(groupedByDate).length === 0 ? (
+          <p className="text-gray-400 text-sm">No hay citas para mostrar.</p>
+        ) : (
+          Object.entries(groupedByDate).map(([day, apts]) => (
+            <div key={day} className="space-y-2">
+              <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+                {day}
+              </p>
 
-<div className="mt-2">
-  <span
-    className={`rounded-full px-3 py-1 text-sm ${
-      appointment.status === "confirmed"
-        ? "bg-green-100 text-green-700"
-        : appointment.status === "completed"
-        ? "bg-blue-100 text-blue-700"
-        : appointment.status === "cancelled"
-        ? "bg-red-100 text-red-700"
-        : "bg-yellow-100 text-yellow-700"
-    }`}
-  >
-    {appointment.status}
-  </span>
-</div>
-          </div>
-        ))}
+              {apts.map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between gap-4"
+                >
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="font-bold">{appointment.patients?.full_name}</p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(appointment.appointment_date).toLocaleTimeString("es-ES", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      {/* 👇 NUEVO — muestra servicio y precio */}
+                      {appointment.appointment_types && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {appointment.appointment_types.name} · ${appointment.appointment_types.price}
+                        </p>
+                      )}
+                    </div>
+
+                    <span className={`text-xs border rounded-full px-3 py-1 font-medium ${STATUS_STYLES[appointment.status]}`}>
+                      {STATUS_LABELS[appointment.status]}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={appointment.status}
+                      onChange={(e) => updateStatus(appointment.id, e.target.value)}
+                      className="rounded border p-2 text-sm"
+                    >
+                      {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      onClick={() => deleteAppointment(appointment.id)}
+                      className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
       </div>
 
+      {/* CALENDARIO */}
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold">
-          Calendario
-        </h2>
-
-        <CalendarView
-          events={calendarEvents}
-        />
+        <h2 className="text-2xl font-bold">Calendario</h2>
+        <CalendarView events={calendarEvents} />
       </div>
     </div>
   )
