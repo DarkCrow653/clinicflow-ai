@@ -21,7 +21,6 @@ export default function DashboardPage() {
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([])
   const [tomorrowAppointments, setTomorrowAppointments] = useState<Appointment[]>([])
 
-  // 👇 KPIs financieros
   const [incomeToday, setIncomeToday] = useState(0)
   const [incomeMonth, setIncomeMonth] = useState(0)
   const [cancellationRate, setCancellationRate] = useState(0)
@@ -77,7 +76,7 @@ export default function DashboardPage() {
       .lte("appointment_date", `${today}T23:59:59`)
       .order("appointment_date", { ascending: true })
 
-    setTodayAppointments(todayData ?? [])
+    setTodayAppointments((todayData as any[]) ?? []) // ✅ fix
 
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -91,9 +90,8 @@ export default function DashboardPage() {
       .lte("appointment_date", `${tomorrowStr}T23:59:59`)
       .order("appointment_date", { ascending: true })
 
-    setTomorrowAppointments(tomorrowData ?? [])
+    setTomorrowAppointments((tomorrowData as any[]) ?? []) // ✅ fix
 
-    // 👇 INGRESOS HOY (solo completadas)
     const { data: incomeTodayData } = await supabase
       .from("appointments")
       .select("price")
@@ -106,7 +104,6 @@ export default function DashboardPage() {
       incomeTodayData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
     )
 
-    // 👇 INGRESOS DEL MES (solo completadas)
     const firstDayMonth = `${today.slice(0, 7)}-01`
     const lastDayMonth = new Date(
       new Date().getFullYear(),
@@ -126,7 +123,6 @@ export default function DashboardPage() {
       incomeMonthData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
     )
 
-    // 👇 TASA DE CANCELACIÓN
     const { data: allAppointments } = await supabase
       .from("appointments")
       .select("status")
@@ -137,7 +133,6 @@ export default function DashboardPage() {
       setCancellationRate(Math.round((cancelled / allAppointments.length) * 100))
     }
 
-    // 👇 PACIENTES NUEVOS DEL MES
     const { count: newPatients } = await supabase
       .from("patients")
       .select("*", { count: "exact", head: true })
@@ -146,7 +141,6 @@ export default function DashboardPage() {
 
     setNewPatientsMonth(newPatients || 0)
 
-    // 👇 SERVICIOS MÁS VENDIDOS (top 5)
     const { data: completedApts } = await supabase
       .from("appointments")
       .select("appointment_types(name)")
@@ -183,7 +177,6 @@ export default function DashboardPage() {
         <p className="mt-2 text-xl">Clínica: {clinicName}</p>
       </div>
 
-      {/* RECORDATORIO DE MAÑANA */}
       {tomorrowAppointments.length > 0 && (
         <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
           <div className="flex items-center gap-2 mb-3">
@@ -203,44 +196,37 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* KPIs GENERALES */}
       <div className="grid gap-6 md:grid-cols-3">
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500">Pacientes</p>
           <h2 className="mt-2 text-4xl font-bold">{totalPatients}</h2>
         </div>
-
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500">Total citas</p>
           <h2 className="mt-2 text-4xl font-bold">{totalAppointments}</h2>
         </div>
-
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500">Citas hoy</p>
           <h2 className="mt-2 text-4xl font-bold">{todayAppointments.length}</h2>
         </div>
       </div>
 
-      {/* KPIs FINANCIEROS */}
       <div className="grid gap-6 md:grid-cols-4">
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500 text-sm">Ingresos hoy</p>
           <h2 className="mt-2 text-3xl font-bold">${incomeToday}</h2>
           <p className="text-xs text-gray-400 mt-1">Solo citas completadas</p>
         </div>
-
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500 text-sm">Ingresos del mes</p>
           <h2 className="mt-2 text-3xl font-bold">${incomeMonth}</h2>
           <p className="text-xs text-gray-400 mt-1">Solo citas completadas</p>
         </div>
-
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500 text-sm">Tasa de cancelación</p>
           <h2 className="mt-2 text-3xl font-bold">{cancellationRate}%</h2>
           <p className="text-xs text-gray-400 mt-1">Del total de citas</p>
         </div>
-
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500 text-sm">Pacientes nuevos</p>
           <h2 className="mt-2 text-3xl font-bold">{newPatientsMonth}</h2>
@@ -248,49 +234,33 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* SERVICIOS MÁS VENDIDOS */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="text-xl font-bold mb-4">Servicios más vendidos</h2>
-
         {topServices.length === 0 ? (
-          <p className="text-gray-400 text-sm">
-            Aún no hay citas completadas con servicio asignado.
-          </p>
+          <p className="text-gray-400 text-sm">Aún no hay citas completadas con servicio asignado.</p>
         ) : (
           <div className="space-y-3">
             {topServices.map((service, index) => (
-              <div
-                key={service.name}
-                className="flex items-center justify-between rounded-xl border p-4"
-              >
+              <div key={service.name} className="flex items-center justify-between rounded-xl border p-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-sm font-bold w-5">
-                    {index + 1}
-                  </span>
+                  <span className="text-gray-400 text-sm font-bold w-5">{index + 1}</span>
                   <p className="font-medium">{service.name}</p>
                 </div>
-                <span className="text-sm text-gray-500">
-                  {service.count} cita{service.count > 1 ? "s" : ""}
-                </span>
+                <span className="text-sm text-gray-500">{service.count} cita{service.count > 1 ? "s" : ""}</span>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* CITAS DE HOY */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="text-xl font-bold mb-4">Citas de hoy</h2>
-
         {todayAppointments.length === 0 ? (
           <p className="text-gray-400 text-sm">No hay citas programadas para hoy.</p>
         ) : (
           <div className="space-y-3">
             {todayAppointments.map((apt) => (
-              <div
-                key={apt.id}
-                className="flex items-center justify-between rounded-xl border p-4"
-              >
+              <div key={apt.id} className="flex items-center justify-between rounded-xl border p-4">
                 <p className="font-medium">{apt.patients?.full_name || "Sin nombre"}</p>
                 <span className="text-sm text-gray-500">{formatHour(apt.appointment_date)}</span>
               </div>
