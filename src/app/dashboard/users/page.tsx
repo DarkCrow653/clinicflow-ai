@@ -99,7 +99,7 @@ export default function UsersPage() {
     }
 
     // Genera el link de invitación
-    const link = `${window.location.origin}/invite/${data.token}`
+    const link = `https://clinicflow-ai-hazel.vercel.app/invite/${data.token}`
     setInviteLink(link)
     setInviteEmail("")
     setSending(false)
