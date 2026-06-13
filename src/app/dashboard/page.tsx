@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase"
 type Appointment = {
   id: string
   appointment_date: string
-  patients: { full_name: string } | { full_name: string }[] | null
+  patients: any
 }
 
 type ServiceStat = {
