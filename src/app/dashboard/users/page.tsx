@@ -7,9 +7,7 @@ type StaffMember = {
   id: string
   role: string
   user_id: string
-  profiles: {
-    email: string
-  } | null
+  email: string | null
 }
 
 type Invitation = {
@@ -41,6 +39,11 @@ export default function UsersPage() {
   const [inviteRole, setInviteRole] = useState("doctor")
   const [inviteLink, setInviteLink] = useState("")
   const [sending, setSending] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
+
+  const filteredStaff = activeFilter
+    ? staff.filter((s) => s.role === activeFilter)
+    : staff
 
   useEffect(() => {
     loadUsers()
@@ -60,9 +63,10 @@ export default function UsersPage() {
     if (!profile) return
     setClinicId(profile.clinic_id)
 
+    // 👇 Usa la vista staff_with_email
     const { data: staffData } = await supabase
-      .from("staff_members")
-      .select("*, profiles(email)")
+      .from("staff_with_email")
+      .select("*")
       .eq("clinic_id", profile.clinic_id)
       .order("created_at", { ascending: true })
 
@@ -98,7 +102,6 @@ export default function UsersPage() {
       return
     }
 
-    // Genera el link de invitación
     const link = `https://clinicflow-ai-hazel.vercel.app/invite/${data.token}`
     setInviteLink(link)
     setInviteEmail("")
@@ -111,6 +114,14 @@ export default function UsersPage() {
       .from("staff_members")
       .update({ role: newRole })
       .eq("id", staffId)
+
+    const member = staff.find((s) => s.id === staffId)
+    if (member) {
+      await supabase
+        .from("profiles")
+        .update({ role: newRole })
+        .eq("id", member.user_id)
+    }
 
     loadUsers()
   }
@@ -133,11 +144,39 @@ export default function UsersPage() {
     alert("¡Link copiado!")
   }
 
+  const totalAdmin = staff.filter((s) => s.role === "admin").length
+  const totalDoctors = staff.filter((s) => s.role === "doctor").length
+  const totalReception = staff.filter((s) => s.role === "reception").length
+
   return (
     <div className="space-y-8 p-10">
       <div>
         <h1 className="text-4xl font-bold">Usuarios</h1>
         <p className="mt-2 text-gray-500">Gestiona el equipo de tu clínica.</p>
+      </div>
+
+      {/* TARJETAS DE ROL */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {[
+          { role: "admin", label: "Admins", count: totalAdmin },
+          { role: "doctor", label: "Doctores", count: totalDoctors },
+          { role: "reception", label: "Recepción", count: totalReception },
+        ].map(({ role, label, count }) => (
+          <button
+            key={role}
+            onClick={() => setActiveFilter(activeFilter === role ? null : role)}
+            className={`rounded-2xl border p-5 shadow-sm text-left transition ${
+              activeFilter === role
+                ? "bg-black text-white border-black"
+                : "bg-white hover:bg-gray-50"
+            }`}
+          >
+            <p className={`text-sm ${activeFilter === role ? "text-gray-300" : "text-gray-500"}`}>
+              {label}
+            </p>
+            <p className="text-3xl font-bold mt-1">{count}</p>
+          </button>
+        ))}
       </div>
 
       {/* INVITAR USUARIO */}
@@ -151,7 +190,6 @@ export default function UsersPage() {
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
           />
-
           <select
             className="w-full rounded border p-2"
             value={inviteRole}
@@ -161,7 +199,6 @@ export default function UsersPage() {
             <option value="reception">Recepción</option>
             <option value="admin">Admin</option>
           </select>
-
           <button
             onClick={sendInvitation}
             disabled={sending || !inviteEmail}
@@ -171,7 +208,6 @@ export default function UsersPage() {
           </button>
         </div>
 
-        {/* LINK GENERADO */}
         {inviteLink && (
           <div className="rounded-xl border bg-gray-50 p-4 space-y-2">
             <p className="text-sm font-medium text-gray-600">
@@ -192,20 +228,42 @@ export default function UsersPage() {
 
       {/* EQUIPO ACTUAL */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-xl font-bold">Equipo actual</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">
+            {activeFilter ? ROLE_LABELS[activeFilter] + "s" : "Equipo actual"}
+          </h2>
+          <div className="flex items-center gap-2">
+            {activeFilter && (
+              <button
+                onClick={() => setActiveFilter(null)}
+                className="text-xs text-gray-400 hover:text-gray-600 border rounded-full px-3 py-1"
+              >
+                Ver todos
+              </button>
+            )}
+            <span className="text-sm text-gray-400">
+              {filteredStaff.length} miembro{filteredStaff.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
 
-        {staff.length === 0 ? (
-          <p className="text-gray-400 text-sm">No hay usuarios en el equipo aún.</p>
+        {filteredStaff.length === 0 ? (
+          <p className="text-gray-400 text-sm">
+            No hay {activeFilter ? ROLE_LABELS[activeFilter].toLowerCase() + "s" : "usuarios"} en el equipo aún.
+          </p>
         ) : (
           <div className="space-y-3">
-            {staff.map((member) => (
+            {filteredStaff.map((member) => (
               <div
                 key={member.id}
                 className="flex items-center justify-between rounded-xl border p-4"
               >
                 <div className="flex items-center gap-3">
                   <div>
-                    <p className="font-medium">{member.profiles?.email || "Sin email"}</p>
+                    <p className="font-medium">{member.email || "Sin email"}</p>
+                    {member.user_id === currentUserId && (
+                      <p className="text-xs text-gray-400">Tú</p>
+                    )}
                   </div>
                   <span className={`text-xs border rounded-full px-3 py-1 font-medium ${ROLE_STYLES[member.role]}`}>
                     {ROLE_LABELS[member.role]}
@@ -223,7 +281,6 @@ export default function UsersPage() {
                       <option value="doctor">Doctor</option>
                       <option value="reception">Recepción</option>
                     </select>
-
                     <button
                       onClick={() => removeStaff(member.id)}
                       className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"
@@ -241,7 +298,12 @@ export default function UsersPage() {
       {/* INVITACIONES PENDIENTES */}
       {invitations.length > 0 && (
         <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
-          <h2 className="text-xl font-bold">Invitaciones pendientes</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Invitaciones pendientes</h2>
+            <span className="text-sm text-gray-400">
+              {invitations.length} pendiente{invitations.length !== 1 ? "s" : ""}
+            </span>
+          </div>
 
           <div className="space-y-3">
             {invitations.map((inv) => (
@@ -256,7 +318,6 @@ export default function UsersPage() {
                   </span>
                   <span className="text-xs text-gray-400">Pendiente</span>
                 </div>
-
                 <button
                   onClick={() => cancelInvitation(inv.id)}
                   className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"
