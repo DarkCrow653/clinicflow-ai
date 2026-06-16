@@ -51,11 +51,23 @@ export default function InvitePage() {
     if (!invitation) return
     setSubmitting(true)
 
-    // 1. Crear cuenta
+    // 👇 Pasa el token como metadata para que el trigger asigne el rol correcto
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          invite_token: params.token,
+        },
+      },
     })
+
+    if (authError?.message?.includes("already registered")) {
+      setMode("login")
+      setError("Este email ya tiene cuenta. Usa 'Ya tengo cuenta'.")
+      setSubmitting(false)
+      return
+    }
 
     if (authError) {
       setError(authError.message)
@@ -70,21 +82,14 @@ export default function InvitePage() {
       return
     }
 
-    // 2. Crear perfil
-    await supabase.from("profiles").insert({
-      id: userId,
-      clinic_id: invitation.clinic_id,
-      role: invitation.role,
-    })
-
-    // 3. Agregar al staff
-    await supabase.from("staff_members").insert({
+    // Agregar al staff
+    await supabase.from("staff_members").upsert({
       clinic_id: invitation.clinic_id,
       user_id: userId,
       role: invitation.role,
-    })
+    }, { onConflict: "clinic_id,user_id" })
 
-    // 4. Marcar invitación como aceptada
+    // Marcar invitación como aceptada
     await supabase
       .from("invitations")
       .update({ accepted: true })
@@ -98,7 +103,6 @@ export default function InvitePage() {
     if (!invitation) return
     setSubmitting(true)
 
-    // 1. Login
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -117,23 +121,21 @@ export default function InvitePage() {
       return
     }
 
-    // 2. Agregar al staff si no existe
+    // Forzar rol y clinic_id correctos
+    await supabase.from("profiles").upsert({
+      id: userId,
+      clinic_id: invitation.clinic_id,
+      role: invitation.role,
+    })
+
+    // Agregar al staff
     await supabase.from("staff_members").upsert({
       clinic_id: invitation.clinic_id,
       user_id: userId,
       role: invitation.role,
     }, { onConflict: "clinic_id,user_id" })
 
-    // 3. Actualizar perfil con nueva clínica y rol
-    await supabase
-      .from("profiles")
-      .update({
-        clinic_id: invitation.clinic_id,
-        role: invitation.role,
-      })
-      .eq("id", userId)
-
-    // 4. Marcar invitación como aceptada
+    // Marcar invitación como aceptada
     await supabase
       .from("invitations")
       .update({ accepted: true })
@@ -172,19 +174,17 @@ export default function InvitePage() {
           <p className="text-gray-500 text-sm">Has sido invitado a unirte a una clínica</p>
         </div>
 
-        {/* BADGE DE ROL */}
         <div className="rounded-xl bg-gray-50 border p-4 text-center">
           <p className="text-sm text-gray-500">Tu rol será</p>
-          <p className="font-bold text-lg capitalize mt-1">
+          <p className="font-bold text-lg mt-1">
             {invitation?.role === "admin" ? "Admin" :
              invitation?.role === "doctor" ? "Doctor" : "Recepción"}
           </p>
         </div>
 
-        {/* TOGGLE REGISTRO / LOGIN */}
         <div className="flex rounded-xl border overflow-hidden">
           <button
-            onClick={() => setMode("register")}
+            onClick={() => { setMode("register"); setError("") }}
             className={`flex-1 py-2 text-sm font-medium transition ${
               mode === "register" ? "bg-black text-white" : "bg-white text-gray-600"
             }`}
@@ -192,7 +192,7 @@ export default function InvitePage() {
             Crear cuenta
           </button>
           <button
-            onClick={() => setMode("login")}
+            onClick={() => { setMode("login"); setError("") }}
             className={`flex-1 py-2 text-sm font-medium transition ${
               mode === "login" ? "bg-black text-white" : "bg-white text-gray-600"
             }`}
@@ -201,7 +201,6 @@ export default function InvitePage() {
           </button>
         </div>
 
-        {/* FORMULARIO */}
         <div className="space-y-3">
           <input
             className="w-full rounded border p-2"
