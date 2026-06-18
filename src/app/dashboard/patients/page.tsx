@@ -86,7 +86,7 @@ export default function PatientsPage() {
 
       <input
         className="w-full rounded-xl border p-3 shadow-sm text-sm"
-        placeholder="🔍 Buscar por nombre o teléfono..."
+        placeholder=" Buscar por nombre o teléfono..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -104,8 +104,9 @@ export default function PatientsPage() {
         <input
           className="w-full rounded border p-2"
           placeholder="Teléfono"
+          type="tel"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
         />
 
         <button

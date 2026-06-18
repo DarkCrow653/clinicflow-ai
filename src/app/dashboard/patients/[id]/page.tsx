@@ -248,7 +248,8 @@ export default function PatientDetailPage() {
             <input
               className="w-full rounded border p-2"
               value={editPhone}
-              onChange={(e) => setEditPhone(e.target.value)}
+              type="tel"
+              onChange={(e) => setEditPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
               placeholder="Teléfono"
             />
             <input
