@@ -11,19 +11,34 @@ type Patient = {
   email: string
 }
 
-type ClinicalEntry = {
+type PatientRecord = {
   id: string
-  content: string
+  consultation_date: string
+  chief_complaint: string | null
+  diagnosis: string | null
+  treatment: string | null
+  observations: string | null
+  next_followup: string | null
+  created_by_email: string | null
   created_at: string
+}
+
+const emptyForm = {
+  consultation_date: new Date().toISOString().split("T")[0],
+  chief_complaint: "",
+  diagnosis: "",
+  treatment: "",
+  observations: "",
+  next_followup: "",
 }
 
 export default function PatientDetailPage() {
   const params = useParams()
 
   const [patient, setPatient] = useState<Patient | null>(null)
-  const [entries, setEntries] = useState<ClinicalEntry[]>([])
-  const [newEntry, setNewEntry] = useState("")
-  const [saving, setSaving] = useState(false)
+  const [records, setRecords] = useState<PatientRecord[]>([])
+  const [clinicId, setClinicId] = useState("")
+  const [userId, setUserId] = useState("")
 
   // Edición de datos del paciente
   const [isEditing, setIsEditing] = useState(false)
@@ -31,14 +46,31 @@ export default function PatientDetailPage() {
   const [editPhone, setEditPhone] = useState("")
   const [editEmail, setEditEmail] = useState("")
 
+  // Formulario de nueva/editada consulta
+  const [showForm, setShowForm] = useState(false)
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+
   useEffect(() => {
     if (params?.id) {
       loadPatient()
-      loadEntries()
+      loadRecords()
     }
   }, [params])
 
   const loadPatient = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) setUserId(user.id)
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("clinic_id")
+      .eq("id", user?.id || "")
+      .single()
+
+    if (profile) setClinicId(profile.clinic_id)
+
     const { data, error } = await supabase
       .from("patients")
       .select("*")
@@ -55,14 +87,14 @@ export default function PatientDetailPage() {
     }
   }
 
-  const loadEntries = async () => {
+  const loadRecords = async () => {
     const { data } = await supabase
-      .from("clinical_entries")
+      .from("patient_records_with_author")
       .select("*")
       .eq("patient_id", params.id)
-      .order("created_at", { ascending: false })
+      .order("consultation_date", { ascending: false })
 
-    if (data) setEntries(data)
+    if (data) setRecords(data)
   }
 
   const savePatient = async () => {
@@ -80,46 +112,83 @@ export default function PatientDetailPage() {
     setIsEditing(false)
   }
 
-  const addEntry = async () => {
-    if (!newEntry.trim() || !patient) return
-    setSaving(true)
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("clinic_id")
-      .eq("id", (await supabase.auth.getUser()).data.user?.id || "")
-      .single()
-
-    const { error } = await supabase
-      .from("clinical_entries")
-      .insert({
-        patient_id: patient.id,
-        clinic_id: profile?.clinic_id,
-        content: newEntry.trim(),
-      })
-
-    if (error) { alert(error.message); setSaving(false); return }
-
-    setNewEntry("")
-    setSaving(false)
-    loadEntries()
+  const openNewForm = () => {
+    setForm(emptyForm)
+    setEditingRecordId(null)
+    setShowForm(true)
   }
 
-  const deleteEntry = async (entryId: string) => {
-    const confirm = window.confirm("¿Eliminar esta entrada?")
+  const openEditForm = (record: PatientRecord) => {
+    setForm({
+      consultation_date: record.consultation_date,
+      chief_complaint: record.chief_complaint || "",
+      diagnosis: record.diagnosis || "",
+      treatment: record.treatment || "",
+      observations: record.observations || "",
+      next_followup: record.next_followup || "",
+    })
+    setEditingRecordId(record.id)
+    setShowForm(true)
+  }
+
+  const saveRecord = async () => {
+    if (!patient) return
+    setSaving(true)
+
+    if (editingRecordId) {
+      // Editar consulta existente
+      const { error } = await supabase
+        .from("patient_records")
+        .update({
+          consultation_date: form.consultation_date,
+          chief_complaint: form.chief_complaint,
+          diagnosis: form.diagnosis,
+          treatment: form.treatment,
+          observations: form.observations,
+          next_followup: form.next_followup || null,
+        })
+        .eq("id", editingRecordId)
+
+      if (error) { alert(error.message); setSaving(false); return }
+    } else {
+      // Nueva consulta
+      const { error } = await supabase
+        .from("patient_records")
+        .insert({
+          patient_id: patient.id,
+          clinic_id: clinicId,
+          created_by: userId,
+          consultation_date: form.consultation_date,
+          chief_complaint: form.chief_complaint,
+          diagnosis: form.diagnosis,
+          treatment: form.treatment,
+          observations: form.observations,
+          next_followup: form.next_followup || null,
+        })
+
+      if (error) { alert(error.message); setSaving(false); return }
+    }
+
+    setSaving(false)
+    setShowForm(false)
+    setEditingRecordId(null)
+    loadRecords()
+  }
+
+  const deleteRecord = async (recordId: string) => {
+    const confirm = window.confirm("¿Eliminar esta consulta? Esta acción no se puede deshacer.")
     if (!confirm) return
 
-    await supabase.from("clinical_entries").delete().eq("id", entryId)
-    loadEntries()
+    const { error } = await supabase.from("patient_records").delete().eq("id", recordId)
+    if (error) { alert(error.message); return }
+    loadRecords()
   }
 
   const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleString("es-ES", {
+    new Date(dateStr + "T00:00:00").toLocaleDateString("es-ES", {
       day: "2-digit",
       month: "long",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     })
 
   if (!patient) return <div className="p-10">Cargando...</div>
@@ -181,48 +250,147 @@ export default function PatientDetailPage() {
 
       {/* HISTORIAL CLÍNICO */}
       <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-xl font-bold">Historial Clínico</h2>
-
-        {/* NUEVA ENTRADA */}
-        <div className="space-y-2">
-          <textarea
-            className="min-h-[120px] w-full rounded border p-4 text-sm"
-            placeholder="Escribe una nueva entrada clínica..."
-            value={newEntry}
-            onChange={(e) => setNewEntry(e.target.value)}
-          />
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">Historial Clínico</h2>
           <button
-            onClick={addEntry}
-            disabled={saving || !newEntry.trim()}
-            className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+            onClick={openNewForm}
+            className="rounded bg-black px-4 py-2 text-sm text-white"
           >
-            {saving ? "Guardando..." : "Agregar entrada"}
+            + Nueva consulta
           </button>
         </div>
 
-        {/* LISTA DE ENTRADAS */}
+        {/* FORMULARIO NUEVA / EDITAR CONSULTA */}
+        {showForm && (
+          <div className="rounded-xl border bg-gray-50 p-5 space-y-3">
+            <h3 className="font-semibold text-sm text-gray-700">
+              {editingRecordId ? "Editar consulta" : "Nueva consulta"}
+            </h3>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="text-xs text-gray-500">Fecha de consulta</label>
+                <input
+                  type="date"
+                  className="w-full rounded border p-2 text-sm"
+                  value={form.consultation_date}
+                  onChange={(e) => setForm({ ...form, consultation_date: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Próxima revisión (opcional)</label>
+                <input
+                  type="date"
+                  className="w-full rounded border p-2 text-sm"
+                  value={form.next_followup}
+                  onChange={(e) => setForm({ ...form, next_followup: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500">Motivo de consulta</label>
+              <textarea
+                className="w-full rounded border p-2 text-sm min-h-[60px]"
+                value={form.chief_complaint}
+                onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
+                placeholder="¿Por qué vino el paciente?"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500">Diagnóstico</label>
+              <textarea
+                className="w-full rounded border p-2 text-sm min-h-[60px]"
+                value={form.diagnosis}
+                onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500">Tratamiento</label>
+              <textarea
+                className="w-full rounded border p-2 text-sm min-h-[60px]"
+                value={form.treatment}
+                onChange={(e) => setForm({ ...form, treatment: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500">Observaciones</label>
+              <textarea
+                className="w-full rounded border p-2 text-sm min-h-[60px]"
+                value={form.observations}
+                onChange={(e) => setForm({ ...form, observations: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={saveRecord}
+                disabled={saving}
+                className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+              >
+                {saving ? "Guardando..." : "Guardar consulta"}
+              </button>
+              <button
+                onClick={() => { setShowForm(false); setEditingRecordId(null) }}
+                className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* LISTA CRONOLÓGICA */}
         <div className="space-y-3 mt-4">
-          {entries.length === 0 ? (
-            <p className="text-gray-400 text-sm">No hay entradas clínicas aún.</p>
+          {records.length === 0 ? (
+            <p className="text-gray-400 text-sm">No hay consultas registradas aún.</p>
           ) : (
-            entries.map((entry) => (
+            records.map((record) => (
               <div
-                key={entry.id}
+                key={record.id}
                 className="rounded-xl border p-4 space-y-2"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400 font-medium">
-                    {formatDate(entry.created_at)}
+                  <span className="text-sm font-semibold text-gray-700">
+                    Consulta {formatDate(record.consultation_date)}
                   </span>
-                  <button
-                    onClick={() => deleteEntry(entry.id)}
-                    className="text-xs text-red-400 hover:text-red-600"
-                  >
-                    Eliminar
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => openEditForm(record)}
+                      className="text-xs text-gray-500 hover:text-black"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => deleteRecord(record.id)}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                  {entry.content}
+
+                {record.chief_complaint && (
+                  <p className="text-sm"><span className="text-gray-500">Motivo:</span> {record.chief_complaint}</p>
+                )}
+                {record.diagnosis && (
+                  <p className="text-sm"><span className="text-gray-500">Diagnóstico:</span> {record.diagnosis}</p>
+                )}
+                {record.treatment && (
+                  <p className="text-sm"><span className="text-gray-500">Tratamiento:</span> {record.treatment}</p>
+                )}
+                {record.observations && (
+                  <p className="text-sm"><span className="text-gray-500">Observaciones:</span> {record.observations}</p>
+                )}
+                {record.next_followup && (
+                  <p className="text-sm"><span className="text-gray-500">Próxima revisión:</span> {formatDate(record.next_followup)}</p>
+                )}
+
+                <p className="text-xs text-gray-400 pt-1">
+                  Registrado por {record.created_by_email || "desconocido"}
                 </p>
               </div>
             ))
