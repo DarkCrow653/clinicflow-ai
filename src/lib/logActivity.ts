@@ -5,7 +5,7 @@ type LogParams = {
   action: string
   entityType: string
   entityId?: string
-  details?: string
+  details?: string | null
 }
 
 export async function logActivity({
