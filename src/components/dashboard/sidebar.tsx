@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { FileSpreadsheet } from "lucide-react"
 
 import {
   LayoutDashboard,
@@ -80,6 +81,12 @@ export default function Sidebar() {
       icon: ScrollText,
       roles: ["admin"],
     },
+    {
+  href: "/dashboard/reports",
+  label: "Reportes",
+  icon: FileSpreadsheet,
+  roles: ["admin"],
+  },
   ]
 
   const links = allLinks.filter((link) => link.roles.includes(role))
