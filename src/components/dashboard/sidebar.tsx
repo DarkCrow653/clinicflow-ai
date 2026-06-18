@@ -11,6 +11,7 @@ import {
   LogOut,
   Stethoscope,
   Users2,
+  ScrollText,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
@@ -47,35 +48,40 @@ export default function Sidebar() {
       href: "/dashboard",
       label: "Dashboard",
       icon: LayoutDashboard,
-      roles: ["admin", "doctor", "reception"], // todos
+      roles: ["admin", "doctor", "reception"],
     },
     {
       href: "/dashboard/patients",
       label: "Pacientes",
       icon: Users,
-      roles: ["admin", "doctor", "reception"], // todos
+      roles: ["admin", "doctor", "reception"],
     },
     {
       href: "/dashboard/appointments",
       label: "Citas",
       icon: CalendarDays,
-      roles: ["admin", "doctor", "reception"], // todos
+      roles: ["admin", "doctor", "reception"],
     },
     {
       href: "/dashboard/services",
       label: "Servicios",
       icon: Stethoscope,
-      roles: ["admin"], // solo admin
+      roles: ["admin"],
     },
     {
       href: "/dashboard/users",
       label: "Usuarios",
       icon: Users2,
-      roles: ["admin"], // solo admin
+      roles: ["admin"],
+    },
+    {
+      href: "/dashboard/activity",
+      label: "Auditoría",
+      icon: ScrollText,
+      roles: ["admin"],
     },
   ]
 
-  // Filtra links según el rol del usuario
   const links = allLinks.filter((link) => link.roles.includes(role))
 
   return (
@@ -83,7 +89,6 @@ export default function Sidebar() {
       <div>
         <h1 className="text-3xl font-bold">ClinicFlow</h1>
         <p className="text-sm text-gray-500">AI Clinic SaaS</p>
-        {/* Badge de rol */}
         {role && (
           <span className="mt-2 inline-block rounded-full border px-2 py-0.5 text-xs text-gray-500 capitalize">
             {role === "admin" ? "Admin" : role === "doctor" ? "Doctor" : "Recepción"}
