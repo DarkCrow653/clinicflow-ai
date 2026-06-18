@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { logActivity } from "@/lib/logActivity"
 
 type StaffMember = {
   id: string
@@ -63,7 +64,6 @@ export default function UsersPage() {
     if (!profile) return
     setClinicId(profile.clinic_id)
 
-    // 👇 Usa la vista staff_with_email
     const { data: staffData } = await supabase
       .from("staff_with_email")
       .select("*")
@@ -102,6 +102,15 @@ export default function UsersPage() {
       return
     }
 
+    // 👇 NUEVO
+    await logActivity({
+      clinicId,
+      action: `invitó a ${inviteEmail} como ${ROLE_LABELS[inviteRole]}`,
+      entityType: "user",
+      entityId: data.id,
+      details: inviteEmail,
+    })
+
     const link = `https://clinicflow-ai-hazel.vercel.app/invite/${data.token}`
     setInviteLink(link)
     setInviteEmail("")
@@ -110,18 +119,28 @@ export default function UsersPage() {
   }
 
   const changeRole = async (staffId: string, newRole: string) => {
+    const member = staff.find((s) => s.id === staffId)
+
     await supabase
       .from("staff_members")
       .update({ role: newRole })
       .eq("id", staffId)
 
-    const member = staff.find((s) => s.id === staffId)
     if (member) {
       await supabase
         .from("profiles")
         .update({ role: newRole })
         .eq("id", member.user_id)
     }
+
+    // 👇 NUEVO
+    await logActivity({
+      clinicId,
+      action: `cambió rol de ${member?.email} a`,
+      entityType: "user",
+      entityId: staffId,
+      details: ROLE_LABELS[newRole],
+    })
 
     loadUsers()
   }
@@ -130,7 +149,19 @@ export default function UsersPage() {
     const confirm = window.confirm("¿Eliminar este usuario del equipo?")
     if (!confirm) return
 
+    const member = staff.find((s) => s.id === staffId)
+
     await supabase.from("staff_members").delete().eq("id", staffId)
+
+    // 👇 NUEVO
+    await logActivity({
+      clinicId,
+      action: "eliminó del equipo a",
+      entityType: "user",
+      entityId: staffId,
+      details: member?.email,
+    })
+
     loadUsers()
   }
 

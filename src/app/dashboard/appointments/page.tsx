@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import CalendarView from "@/components/calendar/calendar-view"
+import { logActivity } from "@/lib/logActivity"
 
 type Patient = {
   id: string
@@ -44,13 +45,12 @@ const STATUS_FILTERS = ["todas", "pending", "confirmed", "completed", "cancelled
 export default function AppointmentsPage() {
   const [patients, setPatients] = useState<Patient[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [services, setServices] = useState<AppointmentType[]>([]) // 👈 NUEVO
+  const [services, setServices] = useState<AppointmentType[]>([])
   const [patientId, setPatientId] = useState("")
   const [date, setDate] = useState("")
   const [clinicId, setClinicId] = useState("")
   const [activeFilter, setActiveFilter] = useState("todas")
 
-  // 👇 NUEVO — servicio seleccionado
   const [selectedServiceId, setSelectedServiceId] = useState("")
   const [selectedPrice, setSelectedPrice] = useState(0)
   const [selectedDuration, setSelectedDuration] = useState(0)
@@ -104,7 +104,6 @@ export default function AppointmentsPage() {
 
     if (patientsData) setPatients(patientsData)
 
-    // 👇 NUEVO — cargar servicios
     const { data: servicesData } = await supabase
       .from("appointment_types")
       .select("*")
@@ -122,7 +121,6 @@ export default function AppointmentsPage() {
     if (appointmentsData) setAppointments(appointmentsData as Appointment[])
   }
 
-  // 👇 NUEVO — al seleccionar servicio, carga precio y duración automáticamente
   const handleServiceChange = (serviceId: string) => {
     setSelectedServiceId(serviceId)
     const service = services.find((s) => s.id === serviceId)
@@ -138,14 +136,30 @@ export default function AppointmentsPage() {
   const createAppointment = async () => {
     if (!patientId || !date || !selectedServiceId) return
 
-    await supabase.from("appointments").insert({
-      clinic_id: clinicId,
-      patient_id: patientId,
-      appointment_date: date,
-      status: "pending",
-      appointment_type_id: selectedServiceId,
-      price: selectedPrice,
-    })
+    const { data, error } = await supabase
+      .from("appointments")
+      .insert({
+        clinic_id: clinicId,
+        patient_id: patientId,
+        appointment_date: date,
+        status: "pending",
+        appointment_type_id: selectedServiceId,
+        price: selectedPrice,
+      })
+      .select()
+      .single()
+
+    if (!error && data) {
+      // 👇 NUEVO
+      const patientName = patients.find((p) => p.id === patientId)?.full_name
+      await logActivity({
+        clinicId,
+        action: "creó cita para",
+        entityType: "appointment",
+        entityId: data.id,
+        details: patientName,
+      })
+    }
 
     setPatientId("")
     setDate("")
@@ -162,6 +176,17 @@ export default function AppointmentsPage() {
       .eq("id", appointmentId)
 
     if (error) { alert(error.message); return }
+
+    // 👇 NUEVO
+    const appointment = appointments.find((a) => a.id === appointmentId)
+    await logActivity({
+      clinicId,
+      action: `cambió cita a "${STATUS_LABELS[status]}" de`,
+      entityType: "appointment",
+      entityId: appointmentId,
+      details: appointment?.patients?.full_name,
+    })
+
     loadAppointments()
   }
 
@@ -169,12 +194,24 @@ export default function AppointmentsPage() {
     const confirm = window.confirm("¿Eliminar esta cita?")
     if (!confirm) return
 
+    const appointment = appointments.find((a) => a.id === appointmentId)
+
     const { error } = await supabase
       .from("appointments")
       .delete()
       .eq("id", appointmentId)
 
     if (error) { alert(error.message); return }
+
+    // 👇 NUEVO
+    await logActivity({
+      clinicId,
+      action: "eliminó cita de",
+      entityType: "appointment",
+      entityId: appointmentId,
+      details: appointment?.patients?.full_name,
+    })
+
     loadAppointments()
   }
 
@@ -201,7 +238,6 @@ export default function AppointmentsPage() {
           ))}
         </select>
 
-        {/* 👇 NUEVO — selector de servicio */}
         <select
           className="w-full rounded border p-2"
           value={selectedServiceId}
@@ -215,7 +251,6 @@ export default function AppointmentsPage() {
           ))}
         </select>
 
-        {/* 👇 NUEVO — info del servicio seleccionado */}
         {selectedServiceId && (
           <div className="rounded-xl border bg-gray-50 px-4 py-3 text-sm text-gray-600 flex gap-6">
             <span>💰 Precio: <strong>${selectedPrice}</strong></span>
@@ -282,7 +317,6 @@ export default function AppointmentsPage() {
                           minute: "2-digit",
                         })}
                       </p>
-                      {/* 👇 NUEVO — muestra servicio y precio */}
                       {appointment.appointment_types && (
                         <p className="text-xs text-gray-400 mt-1">
                           {appointment.appointment_types.name} · ${appointment.appointment_types.price}

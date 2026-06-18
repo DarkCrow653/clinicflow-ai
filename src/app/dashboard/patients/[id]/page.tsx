@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { logActivity } from "@/lib/logActivity"
 
 type Patient = {
   id: string
@@ -108,6 +109,14 @@ export default function PatientDetailPage() {
 
     if (error) { alert(error.message); return }
 
+    await logActivity({
+      clinicId,
+      action: "editó datos de paciente",
+      entityType: "patient",
+      entityId: patient.id,
+      details: editName,
+    })
+
     setPatient({ ...patient, full_name: editName, phone: editPhone, email: editEmail })
     setIsEditing(false)
   }
@@ -150,9 +159,18 @@ export default function PatientDetailPage() {
         .eq("id", editingRecordId)
 
       if (error) { alert(error.message); setSaving(false); return }
+
+      // 👇 NUEVO
+      await logActivity({
+        clinicId,
+        action: "editó consulta de",
+        entityType: "patient_record",
+        entityId: editingRecordId,
+        details: patient.full_name,
+      })
     } else {
       // Nueva consulta
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("patient_records")
         .insert({
           patient_id: patient.id,
@@ -165,8 +183,19 @@ export default function PatientDetailPage() {
           observations: form.observations,
           next_followup: form.next_followup || null,
         })
+        .select()
+        .single()
 
       if (error) { alert(error.message); setSaving(false); return }
+
+      // 👇 NUEVO
+      await logActivity({
+        clinicId,
+        action: "registró nueva consulta para",
+        entityType: "patient_record",
+        entityId: data?.id,
+        details: patient.full_name,
+      })
     }
 
     setSaving(false)
@@ -181,6 +210,16 @@ export default function PatientDetailPage() {
 
     const { error } = await supabase.from("patient_records").delete().eq("id", recordId)
     if (error) { alert(error.message); return }
+
+    // 👇 NUEVO
+    await logActivity({
+      clinicId,
+      action: "eliminó consulta de",
+      entityType: "patient_record",
+      entityId: recordId,
+      details: patient?.full_name,
+    })
+
     loadRecords()
   }
 
@@ -242,7 +281,7 @@ export default function PatientDetailPage() {
               onClick={() => setIsEditing(true)}
               className="mt-3 rounded border px-4 py-2 text-sm hover:bg-gray-50"
             >
-              ✏️ Editar datos
+                Editar datos
             </button>
           </div>
         )}

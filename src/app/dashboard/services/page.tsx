@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { logActivity } from "@/lib/logActivity"
 
 type AppointmentType = {
   id: string
@@ -50,12 +51,27 @@ export default function ServicesPage() {
   const createService = async () => {
     if (!name || !price || !duration) return
 
-    await supabase.from("appointment_types").insert({
-      clinic_id: clinicId,
-      name,
-      price: parseFloat(price),
-      duration_minutes: parseInt(duration),
-    })
+    const { data, error } = await supabase
+      .from("appointment_types")
+      .insert({
+        clinic_id: clinicId,
+        name,
+        price: parseFloat(price),
+        duration_minutes: parseInt(duration),
+      })
+      .select()
+      .single()
+
+    if (!error && data) {
+      // 👇 NUEVO
+      await logActivity({
+        clinicId,
+        action: "creó servicio",
+        entityType: "service",
+        entityId: data.id,
+        details: name,
+      })
+    }
 
     setName("")
     setPrice("")
@@ -73,6 +89,15 @@ export default function ServicesPage() {
       })
       .eq("id", id)
 
+    // 👇 NUEVO
+    await logActivity({
+      clinicId,
+      action: "editó servicio",
+      entityType: "service",
+      entityId: id,
+      details: editName,
+    })
+
     setEditingId(null)
     loadServices()
   }
@@ -81,7 +106,19 @@ export default function ServicesPage() {
     const confirm = window.confirm("¿Eliminar este servicio?")
     if (!confirm) return
 
+    const service = services.find((s) => s.id === id)
+
     await supabase.from("appointment_types").delete().eq("id", id)
+
+    // 👇 NUEVO
+    await logActivity({
+      clinicId,
+      action: "eliminó servicio",
+      entityType: "service",
+      entityId: id,
+      details: service?.name,
+    })
+
     loadServices()
   }
 
@@ -146,7 +183,6 @@ export default function ServicesPage() {
               className="rounded-2xl border bg-white p-4 shadow-sm"
             >
               {editingId === service.id ? (
-                // MODO EDICIÓN
                 <div className="space-y-3">
                   <input
                     className="w-full rounded border p-2 font-bold"
@@ -185,7 +221,6 @@ export default function ServicesPage() {
                   </div>
                 </div>
               ) : (
-                // MODO VISTA
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-bold text-lg">{service.name}</p>
