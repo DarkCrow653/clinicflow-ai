@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
+import Link from "next/link"
 
 type Patient = {
   id: string
@@ -41,13 +42,11 @@ export default function PatientDetailPage() {
   const [clinicId, setClinicId] = useState("")
   const [userId, setUserId] = useState("")
 
-  // Edición de datos del paciente
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
   const [editPhone, setEditPhone] = useState("")
   const [editEmail, setEditEmail] = useState("")
 
-  // Formulario de nueva/editada consulta
   const [showForm, setShowForm] = useState(false)
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -145,7 +144,6 @@ export default function PatientDetailPage() {
     setSaving(true)
 
     if (editingRecordId) {
-      // Editar consulta existente
       const { error } = await supabase
         .from("patient_records")
         .update({
@@ -160,7 +158,6 @@ export default function PatientDetailPage() {
 
       if (error) { alert(error.message); setSaving(false); return }
 
-      // 👇 NUEVO
       await logActivity({
         clinicId,
         action: "editó consulta de",
@@ -169,7 +166,6 @@ export default function PatientDetailPage() {
         details: patient.full_name,
       })
     } else {
-      // Nueva consulta
       const { data, error } = await supabase
         .from("patient_records")
         .insert({
@@ -188,7 +184,6 @@ export default function PatientDetailPage() {
 
       if (error) { alert(error.message); setSaving(false); return }
 
-      // 👇 NUEVO
       await logActivity({
         clinicId,
         action: "registró nueva consulta para",
@@ -211,7 +206,6 @@ export default function PatientDetailPage() {
     const { error } = await supabase.from("patient_records").delete().eq("id", recordId)
     if (error) { alert(error.message); return }
 
-    // 👇 NUEVO
     await logActivity({
       clinicId,
       action: "eliminó consulta de",
@@ -278,12 +272,23 @@ export default function PatientDetailPage() {
             <h1 className="text-3xl font-bold">{patient.full_name}</h1>
             <p className="text-gray-600">{patient.phone}</p>
             <p className="text-gray-600">{patient.email}</p>
-            <button
-              onClick={() => setIsEditing(true)}
-              className="mt-3 rounded border px-4 py-2 text-sm hover:bg-gray-50"
-            >
+
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+              >
                 Editar datos
-            </button>
+              </button>
+
+              {/* 👇 NUEVO — botón al odontograma */}
+              <Link
+                href={`/dashboard/patients/${patient.id}/odontogram`}
+                className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                🦷 Ver odontograma
+              </Link>
+            </div>
           </div>
         )}
       </div>
@@ -300,7 +305,6 @@ export default function PatientDetailPage() {
           </button>
         </div>
 
-        {/* FORMULARIO NUEVA / EDITAR CONSULTA */}
         {showForm && (
           <div className="rounded-xl border bg-gray-50 p-5 space-y-3">
             <h3 className="font-semibold text-sm text-gray-700">
