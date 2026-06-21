@@ -281,12 +281,18 @@ export default function PatientDetailPage() {
                 Editar datos
               </button>
 
-              {/* 👇 NUEVO — botón al odontograma */}
               <Link
                 href={`/dashboard/patients/${patient.id}/odontogram`}
                 className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
               >
                 🦷 Ver odontograma
+              </Link>
+
+              <Link
+                href={`/dashboard/patients/${patient.id}/treatments`}
+                className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                📋 Tratamientos
               </Link>
             </div>
           </div>
