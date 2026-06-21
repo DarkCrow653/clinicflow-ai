@@ -15,7 +15,7 @@ type ServiceStat = {
 }
 
 export default function DashboardPage() {
-  const [role, setRole] = useState("") // 👈 NUEVO
+  const [role, setRole] = useState("")
   const [clinicName, setClinicName] = useState("")
   const [totalPatients, setTotalPatients] = useState(0)
   const [totalAppointments, setTotalAppointments] = useState(0)
@@ -37,13 +37,13 @@ export default function DashboardPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("clinic_id, role") // 👈 NUEVO
+      .select("clinic_id, role")
       .eq("id", user.id)
       .single()
 
     if (!profile) return
     const clinicId = profile.clinic_id
-    setRole(profile.role) // 👈 NUEVO
+    setRole(profile.role)
 
     const { data: clinic } = await supabase
       .from("clinics")
@@ -93,8 +93,8 @@ export default function DashboardPage() {
 
     setTomorrowAppointments((tomorrowData as any[]) ?? [])
 
-    // 👇 Solo carga KPIs financieros si es admin
     if (profile.role === "admin") {
+      // INGRESOS HOY — citas completadas
       const { data: incomeTodayData } = await supabase
         .from("appointments")
         .select("price")
@@ -103,9 +103,19 @@ export default function DashboardPage() {
         .gte("appointment_date", `${today}T00:00:00`)
         .lte("appointment_date", `${today}T23:59:59`)
 
-      setIncomeToday(
-        incomeTodayData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
-      )
+      // 👇 NUEVO — ingresos de tratamientos dentales completados hoy
+      const { data: treatmentIncomeTodayData } = await supabase
+        .from("treatment_items")
+        .select("price, treatment_plans!inner(clinic_id)")
+        .eq("status", "completed")
+        .eq("treatment_plans.clinic_id", clinicId)
+        .gte("completed_at", `${today}T00:00:00`)
+        .lte("completed_at", `${today}T23:59:59`)
+
+      const appointmentIncomeToday = incomeTodayData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
+      const treatmentIncomeToday = treatmentIncomeTodayData?.reduce((sum, t) => sum + (t.price || 0), 0) ?? 0
+
+      setIncomeToday(appointmentIncomeToday + treatmentIncomeToday)
 
       const firstDayMonth = `${today.slice(0, 7)}-01`
       const lastDayMonth = new Date(
@@ -114,6 +124,7 @@ export default function DashboardPage() {
         0
       ).toISOString().split("T")[0]
 
+      // INGRESOS DEL MES — citas completadas
       const { data: incomeMonthData } = await supabase
         .from("appointments")
         .select("price")
@@ -122,9 +133,19 @@ export default function DashboardPage() {
         .gte("appointment_date", `${firstDayMonth}T00:00:00`)
         .lte("appointment_date", `${lastDayMonth}T23:59:59`)
 
-      setIncomeMonth(
-        incomeMonthData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
-      )
+      // 👇 NUEVO — ingresos de tratamientos dentales completados este mes
+      const { data: treatmentIncomeMonthData } = await supabase
+        .from("treatment_items")
+        .select("price, treatment_plans!inner(clinic_id)")
+        .eq("status", "completed")
+        .eq("treatment_plans.clinic_id", clinicId)
+        .gte("completed_at", `${firstDayMonth}T00:00:00`)
+        .lte("completed_at", `${lastDayMonth}T23:59:59`)
+
+      const appointmentIncomeMonth = incomeMonthData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
+      const treatmentIncomeMonth = treatmentIncomeMonthData?.reduce((sum, t) => sum + (t.price || 0), 0) ?? 0
+
+      setIncomeMonth(appointmentIncomeMonth + treatmentIncomeMonth)
 
       const { data: allAppointments } = await supabase
         .from("appointments")
@@ -174,7 +195,7 @@ export default function DashboardPage() {
       minute: "2-digit",
     })
 
-  const isAdmin = role === "admin" // 👈 helper
+  const isAdmin = role === "admin"
 
   return (
     <div className="space-y-8 p-10">
@@ -202,7 +223,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* KPIs GENERALES — todos los roles */}
       <div className="grid gap-6 md:grid-cols-3">
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-gray-500">Pacientes</p>
@@ -218,19 +238,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPIs FINANCIEROS — solo admin 👇 */}
       {isAdmin && (
         <>
           <div className="grid gap-6 md:grid-cols-4">
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <p className="text-gray-500 text-sm">Ingresos hoy</p>
               <h2 className="mt-2 text-3xl font-bold">${incomeToday}</h2>
-              <p className="text-xs text-gray-400 mt-1">Solo citas completadas</p>
+              <p className="text-xs text-gray-400 mt-1">Citas + tratamientos completados</p>
             </div>
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <p className="text-gray-500 text-sm">Ingresos del mes</p>
               <h2 className="mt-2 text-3xl font-bold">${incomeMonth}</h2>
-              <p className="text-xs text-gray-400 mt-1">Solo citas completadas</p>
+              <p className="text-xs text-gray-400 mt-1">Citas + tratamientos completados</p>
             </div>
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <p className="text-gray-500 text-sm">Tasa de cancelación</p>
@@ -265,7 +284,6 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* CITAS DE HOY — todos los roles */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="text-xl font-bold mb-4">Citas de hoy</h2>
         {todayAppointments.length === 0 ? (

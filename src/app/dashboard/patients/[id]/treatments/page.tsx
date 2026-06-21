@@ -60,7 +60,6 @@ export default function TreatmentsPage() {
 
   const [newPlanTitle, setNewPlanTitle] = useState("")
 
-  // Formulario de nuevo item, por plan abierto
   const [openItemForm, setOpenItemForm] = useState<string | null>(null)
   const [itemTooth, setItemTooth] = useState("")
   const [itemServiceId, setItemServiceId] = useState("")
@@ -180,8 +179,16 @@ export default function TreatmentsPage() {
     loadPlans()
   }
 
+  // 👇 ACTUALIZADO — ahora guarda completed_at cuando el procedimiento se completa
   const updateItemStatus = async (itemId: string, planId: string, status: string) => {
-    await supabase.from("treatment_items").update({ status }).eq("id", itemId)
+    await supabase
+      .from("treatment_items")
+      .update({
+        status,
+        completed_at: status === "completed" ? new Date().toISOString() : null,
+      })
+      .eq("id", itemId)
+
     loadPlans()
   }
 
@@ -236,7 +243,6 @@ export default function TreatmentsPage() {
           return (
             <div key={plan.id} className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
 
-              {/* HEADER DEL PLAN */}
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-xl font-bold">{plan.title}</h3>
@@ -263,7 +269,6 @@ export default function TreatmentsPage() {
                 </div>
               </div>
 
-              {/* BARRA DE PROGRESO */}
               <div>
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                   <span>Progreso</span>
@@ -277,7 +282,6 @@ export default function TreatmentsPage() {
                 </div>
               </div>
 
-              {/* LISTA DE PROCEDIMIENTOS */}
               <div className="space-y-2">
                 {plan.treatment_items.length === 0 ? (
                   <p className="text-gray-400 text-sm">Sin procedimientos aún.</p>
@@ -320,7 +324,6 @@ export default function TreatmentsPage() {
                 )}
               </div>
 
-              {/* AGREGAR PROCEDIMIENTO */}
               {openItemForm === plan.id ? (
                 <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
