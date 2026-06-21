@@ -29,21 +29,19 @@ export default function InvitePage() {
   }, [params])
 
   const loadInvitation = async () => {
-    const { data, error } = await supabase
-      .from("invitations")
-      .select("*")
-      .eq("token", params.token)
-      .eq("accepted", false)
-      .single()
+    // 👇 Usa la función segura en vez de consultar la tabla directamente
+    const { data, error } = await supabase.rpc("get_invitation_by_token", {
+      p_token: params.token,
+    })
 
-    if (error || !data) {
+    if (error || !data || data.length === 0) {
       setError("Esta invitación no existe o ya fue usada.")
       setLoading(false)
       return
     }
 
-    setInvitation(data)
-    setEmail(data.email)
+    setInvitation(data[0])
+    setEmail(data[0].email)
     setLoading(false)
   }
 
@@ -51,7 +49,6 @@ export default function InvitePage() {
     if (!invitation) return
     setSubmitting(true)
 
-    // 👇 Pasa el token como metadata para que el trigger asigne el rol correcto
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -82,18 +79,14 @@ export default function InvitePage() {
       return
     }
 
-    // Agregar al staff
     await supabase.from("staff_members").upsert({
       clinic_id: invitation.clinic_id,
       user_id: userId,
       role: invitation.role,
     }, { onConflict: "clinic_id,user_id" })
 
-    // Marcar invitación como aceptada
-    await supabase
-      .from("invitations")
-      .update({ accepted: true })
-      .eq("id", invitation.id)
+    // 👇 Marca la invitación como aceptada vía función segura
+    await supabase.rpc("accept_invitation", { p_token: params.token })
 
     setSubmitting(false)
     router.push("/dashboard")
@@ -121,25 +114,20 @@ export default function InvitePage() {
       return
     }
 
-    // Forzar rol y clinic_id correctos
     await supabase.from("profiles").upsert({
       id: userId,
       clinic_id: invitation.clinic_id,
       role: invitation.role,
     })
 
-    // Agregar al staff
     await supabase.from("staff_members").upsert({
       clinic_id: invitation.clinic_id,
       user_id: userId,
       role: invitation.role,
     }, { onConflict: "clinic_id,user_id" })
 
-    // Marcar invitación como aceptada
-    await supabase
-      .from("invitations")
-      .update({ accepted: true })
-      .eq("id", invitation.id)
+    // 👇 Marca la invitación como aceptada vía función segura
+    await supabase.rpc("accept_invitation", { p_token: params.token })
 
     setSubmitting(false)
     router.push("/dashboard")
