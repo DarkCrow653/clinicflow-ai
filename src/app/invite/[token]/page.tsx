@@ -29,7 +29,6 @@ export default function InvitePage() {
   }, [params])
 
   const loadInvitation = async () => {
-    // 👇 Usa la función segura en vez de consultar la tabla directamente
     const { data, error } = await supabase.rpc("get_invitation_by_token", {
       p_token: params.token,
     })
@@ -79,13 +78,12 @@ export default function InvitePage() {
       return
     }
 
+    // ✅ Ya no se manda role — profiles es la única fuente de verdad
     await supabase.from("staff_members").upsert({
       clinic_id: invitation.clinic_id,
       user_id: userId,
-      role: invitation.role,
     }, { onConflict: "clinic_id,user_id" })
 
-    // 👇 Marca la invitación como aceptada vía función segura
     await supabase.rpc("accept_invitation", { p_token: params.token })
 
     setSubmitting(false)
@@ -120,13 +118,12 @@ export default function InvitePage() {
       role: invitation.role,
     })
 
+    // ✅ Ya no se manda role — profiles es la única fuente de verdad
     await supabase.from("staff_members").upsert({
       clinic_id: invitation.clinic_id,
       user_id: userId,
-      role: invitation.role,
     }, { onConflict: "clinic_id,user_id" })
 
-    // 👇 Marca la invitación como aceptada vía función segura
     await supabase.rpc("accept_invitation", { p_token: params.token })
 
     setSubmitting(false)

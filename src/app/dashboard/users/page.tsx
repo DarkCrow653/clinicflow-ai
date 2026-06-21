@@ -102,7 +102,6 @@ export default function UsersPage() {
       return
     }
 
-    // 👇 NUEVO
     await logActivity({
       clinicId,
       action: `invitó a ${inviteEmail} como ${ROLE_LABELS[inviteRole]}`,
@@ -118,25 +117,19 @@ export default function UsersPage() {
     loadUsers()
   }
 
+  // ✅ Limpio — solo actualiza profiles, fuente única de verdad
   const changeRole = async (staffId: string, newRole: string) => {
     const member = staff.find((s) => s.id === staffId)
+    if (!member) return
 
     await supabase
-      .from("staff_members")
+      .from("profiles")
       .update({ role: newRole })
-      .eq("id", staffId)
+      .eq("id", member.user_id)
 
-    if (member) {
-      await supabase
-        .from("profiles")
-        .update({ role: newRole })
-        .eq("id", member.user_id)
-    }
-
-    // 👇 NUEVO
     await logActivity({
       clinicId,
-      action: `cambió rol de ${member?.email} a`,
+      action: `cambió rol de ${member.email} a`,
       entityType: "user",
       entityId: staffId,
       details: ROLE_LABELS[newRole],
@@ -153,7 +146,6 @@ export default function UsersPage() {
 
     await supabase.from("staff_members").delete().eq("id", staffId)
 
-    // 👇 NUEVO
     await logActivity({
       clinicId,
       action: "eliminó del equipo a",
