@@ -100,7 +100,8 @@ export default function Sidebar() {
 
   return (
     <div className="flex h-screen w-72 flex-col border-r bg-white p-6">
-      <div>
+      {/* HEADER — fijo */}
+      <div className="shrink-0">
         <h1 className="text-3xl font-bold">ClinicFlow</h1>
         <p className="text-sm text-gray-500">AI Clinic SaaS</p>
         {role && (
@@ -110,7 +111,8 @@ export default function Sidebar() {
         )}
       </div>
 
-      <div className="mt-10 flex flex-col gap-2">
+      {/* LINKS — con scroll propio, independiente del contenido */}
+      <div className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
         {links.map((link) => {
           const Icon = link.icon
           const active = pathname === link.href
@@ -120,7 +122,7 @@ export default function Sidebar() {
               key={link.href}
               href={link.href}
               className={`
-                flex items-center gap-3 rounded-lg px-4 py-3 transition
+                flex items-center gap-3 rounded-lg px-4 py-3 transition shrink-0
                 ${active ? "bg-black text-white" : "hover:bg-gray-100"}
               `}
             >
@@ -131,9 +133,10 @@ export default function Sidebar() {
         })}
       </div>
 
+      {/* LOGOUT — fijo abajo */}
       <button
         onClick={handleLogout}
-        className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-black p-3 text-white"
+        className="mt-4 flex shrink-0 items-center justify-center gap-2 rounded-lg bg-black p-3 text-white"
       >
         <LogOut size={18} />
         Logout
