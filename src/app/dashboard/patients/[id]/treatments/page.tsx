@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import jsPDF from "jspdf"
 import { supabase } from "@/lib/supabase"
 
 type Service = {
@@ -179,7 +180,6 @@ export default function TreatmentsPage() {
     loadPlans()
   }
 
-  // 👇 ACTUALIZADO — ahora guarda completed_at cuando el procedimiento se completa
   const updateItemStatus = async (itemId: string, planId: string, status: string) => {
     await supabase
       .from("treatment_items")
@@ -202,6 +202,88 @@ export default function TreatmentsPage() {
     if (items.length === 0) return 0
     const completed = items.filter((i) => i.status === "completed").length
     return Math.round((completed / items.length) * 100)
+  }
+
+  // 👇 NUEVO — genera el PDF del presupuesto
+  const generateBudgetPDF = async (plan: TreatmentPlan) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("clinic_id")
+      .eq("id", user?.id || "")
+      .single()
+
+    if (!profile) return
+
+    const { data: clinic } = await supabase
+      .from("clinics")
+      .select("*")
+      .eq("id", profile.clinic_id)
+      .single()
+
+    const doc = new jsPDF()
+    let y = 20
+
+    doc.setFontSize(18)
+    doc.setFont("helvetica", "bold")
+    doc.text(clinic?.name || "Clínica", 20, y)
+
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+    y += 7
+    if (clinic?.address) { doc.text(clinic.address, 20, y); y += 5 }
+    if (clinic?.phone) { doc.text(`Tel: ${clinic.phone}`, 20, y); y += 5 }
+    if (clinic?.email) { doc.text(clinic.email, 20, y); y += 5 }
+
+    y += 5
+    doc.setDrawColor(200)
+    doc.line(20, y, 190, y)
+    y += 10
+
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("Presupuesto de Tratamiento", 20, y)
+    y += 10
+
+    doc.setFontSize(11)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Paciente: ${patientName}`, 20, y)
+    y += 6
+    doc.text(`Plan: ${plan.title}`, 20, y)
+    y += 6
+    doc.text(`Fecha: ${new Date().toLocaleDateString("es-ES")}`, 20, y)
+    y += 12
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Procedimiento", 20, y)
+    doc.text("Pieza", 120, y)
+    doc.text("Precio", 165, y)
+    y += 3
+    doc.line(20, y, 190, y)
+    y += 7
+
+    doc.setFont("helvetica", "normal")
+    plan.treatment_items.forEach((item) => {
+      doc.text(item.appointment_types?.name || "Servicio", 20, y)
+      doc.text(item.tooth_number ? String(item.tooth_number) : "-", 120, y)
+      doc.text(`$${item.price}`, 165, y)
+      y += 7
+    })
+
+    y += 3
+    doc.line(20, y, 190, y)
+    y += 8
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(13)
+    doc.text(`Total: $${plan.total_amount}`, 150, y)
+
+    y += 20
+    doc.setFontSize(9)
+    doc.setFont("helvetica", "normal")
+    doc.setTextColor(150)
+    doc.text("Este presupuesto es una estimación y puede variar según evolución del tratamiento.", 20, y)
+
+    doc.save(`presupuesto_${patientName.replace(/\s/g, "_")}_${Date.now()}.pdf`)
   }
 
   return (
@@ -259,6 +341,14 @@ export default function TreatmentsPage() {
                       <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
+
+                  {/* 👇 NUEVO — botón generar presupuesto */}
+                  <button
+                    onClick={() => generateBudgetPDF(plan)}
+                    className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
+                  >
+                    📄 Generar Presupuesto
+                  </button>
 
                   <button
                     onClick={() => deletePlan(plan.id)}

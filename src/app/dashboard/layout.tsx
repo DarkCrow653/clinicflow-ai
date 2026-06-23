@@ -6,8 +6,8 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen bg-gray-100">
-      <aside className="sticky top-0 h-screen shrink-0">
+    <div className="flex h-screen overflow-hidden bg-gray-100">
+      <aside className="h-screen shrink-0 overflow-hidden">
         <Sidebar />
       </aside>
 
