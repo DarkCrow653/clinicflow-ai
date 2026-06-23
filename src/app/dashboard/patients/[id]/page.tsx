@@ -41,6 +41,7 @@ export default function PatientDetailPage() {
   const [records, setRecords] = useState<PatientRecord[]>([])
   const [clinicId, setClinicId] = useState("")
   const [userId, setUserId] = useState("")
+  const [role, setRole] = useState("") // 👈 NUEVO
 
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
@@ -65,11 +66,14 @@ export default function PatientDetailPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("clinic_id")
+      .select("clinic_id, role")
       .eq("id", user?.id || "")
       .single()
 
-    if (profile) setClinicId(profile.clinic_id)
+    if (profile) {
+      setClinicId(profile.clinic_id)
+      setRole(profile.role) // 👈 NUEVO
+    }
 
     const { data, error } = await supabase
       .from("patients")
@@ -226,6 +230,8 @@ export default function PatientDetailPage() {
 
   if (!patient) return <div className="p-10">Cargando...</div>
 
+  const canSeeClinicalData = role === "admin" || role === "doctor" // 👈 NUEVO
+
   return (
     <div className="space-y-6 p-10">
 
@@ -281,172 +287,178 @@ export default function PatientDetailPage() {
                 Editar datos
               </button>
 
-              <Link
-                href={`/dashboard/patients/${patient.id}/odontogram`}
-                className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
-              >
-                🦷 Ver odontograma
-              </Link>
+              {/* 👇 Solo visibles para admin/doctor */}
+              {canSeeClinicalData && (
+                <>
+                  <Link
+                    href={`/dashboard/patients/${patient.id}/odontogram`}
+                    className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    🦷 Ver odontograma
+                  </Link>
 
-              <Link
-                href={`/dashboard/patients/${patient.id}/treatments`}
-                className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
-              >
-                📋 Tratamientos
-              </Link>
+                  <Link
+                    href={`/dashboard/patients/${patient.id}/treatments`}
+                    className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    📋 Tratamientos
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* HISTORIAL CLÍNICO */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Historial Clínico</h2>
-          <button
-            onClick={openNewForm}
-            className="rounded bg-black px-4 py-2 text-sm text-white"
-          >
-            + Nueva consulta
-          </button>
-        </div>
-
-        {showForm && (
-          <div className="rounded-xl border bg-gray-50 p-5 space-y-3">
-            <h3 className="font-semibold text-sm text-gray-700">
-              {editingRecordId ? "Editar consulta" : "Nueva consulta"}
-            </h3>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <label className="text-xs text-gray-500">Fecha de consulta</label>
-                <input
-                  type="date"
-                  className="w-full rounded border p-2 text-sm"
-                  value={form.consultation_date}
-                  onChange={(e) => setForm({ ...form, consultation_date: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500">Próxima revisión (opcional)</label>
-                <input
-                  type="date"
-                  className="w-full rounded border p-2 text-sm"
-                  value={form.next_followup}
-                  onChange={(e) => setForm({ ...form, next_followup: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500">Motivo de consulta</label>
-              <textarea
-                className="w-full rounded border p-2 text-sm min-h-[60px]"
-                value={form.chief_complaint}
-                onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
-                placeholder="¿Por qué vino el paciente?"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500">Diagnóstico</label>
-              <textarea
-                className="w-full rounded border p-2 text-sm min-h-[60px]"
-                value={form.diagnosis}
-                onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500">Tratamiento</label>
-              <textarea
-                className="w-full rounded border p-2 text-sm min-h-[60px]"
-                value={form.treatment}
-                onChange={(e) => setForm({ ...form, treatment: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500">Observaciones</label>
-              <textarea
-                className="w-full rounded border p-2 text-sm min-h-[60px]"
-                value={form.observations}
-                onChange={(e) => setForm({ ...form, observations: e.target.value })}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={saveRecord}
-                disabled={saving}
-                className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-              >
-                {saving ? "Guardando..." : "Guardar consulta"}
-              </button>
-              <button
-                onClick={() => { setShowForm(false); setEditingRecordId(null) }}
-                className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
-              >
-                Cancelar
-              </button>
-            </div>
+      {/* HISTORIAL CLÍNICO — solo admin/doctor */}
+      {canSeeClinicalData && (
+        <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Historial Clínico</h2>
+            <button
+              onClick={openNewForm}
+              className="rounded bg-black px-4 py-2 text-sm text-white"
+            >
+              + Nueva consulta
+            </button>
           </div>
-        )}
 
-        {/* LISTA CRONOLÓGICA */}
-        <div className="space-y-3 mt-4">
-          {records.length === 0 ? (
-            <p className="text-gray-400 text-sm">No hay consultas registradas aún.</p>
-          ) : (
-            records.map((record) => (
-              <div
-                key={record.id}
-                className="rounded-xl border p-4 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700">
-                    Consulta {formatDate(record.consultation_date)}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => openEditForm(record)}
-                      className="text-xs text-gray-500 hover:text-black"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => deleteRecord(record.id)}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
+          {showForm && (
+            <div className="rounded-xl border bg-gray-50 p-5 space-y-3">
+              <h3 className="font-semibold text-sm text-gray-700">
+                {editingRecordId ? "Editar consulta" : "Nueva consulta"}
+              </h3>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-500">Fecha de consulta</label>
+                  <input
+                    type="date"
+                    className="w-full rounded border p-2 text-sm"
+                    value={form.consultation_date}
+                    onChange={(e) => setForm({ ...form, consultation_date: e.target.value })}
+                  />
                 </div>
-
-                {record.chief_complaint && (
-                  <p className="text-sm"><span className="text-gray-500">Motivo:</span> {record.chief_complaint}</p>
-                )}
-                {record.diagnosis && (
-                  <p className="text-sm"><span className="text-gray-500">Diagnóstico:</span> {record.diagnosis}</p>
-                )}
-                {record.treatment && (
-                  <p className="text-sm"><span className="text-gray-500">Tratamiento:</span> {record.treatment}</p>
-                )}
-                {record.observations && (
-                  <p className="text-sm"><span className="text-gray-500">Observaciones:</span> {record.observations}</p>
-                )}
-                {record.next_followup && (
-                  <p className="text-sm"><span className="text-gray-500">Próxima revisión:</span> {formatDate(record.next_followup)}</p>
-                )}
-
-                <p className="text-xs text-gray-400 pt-1">
-                  Registrado por {record.created_by_email || "desconocido"}
-                </p>
+                <div>
+                  <label className="text-xs text-gray-500">Próxima revisión (opcional)</label>
+                  <input
+                    type="date"
+                    className="w-full rounded border p-2 text-sm"
+                    value={form.next_followup}
+                    onChange={(e) => setForm({ ...form, next_followup: e.target.value })}
+                  />
+                </div>
               </div>
-            ))
+
+              <div>
+                <label className="text-xs text-gray-500">Motivo de consulta</label>
+                <textarea
+                  className="w-full rounded border p-2 text-sm min-h-[60px]"
+                  value={form.chief_complaint}
+                  onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
+                  placeholder="¿Por qué vino el paciente?"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500">Diagnóstico</label>
+                <textarea
+                  className="w-full rounded border p-2 text-sm min-h-[60px]"
+                  value={form.diagnosis}
+                  onChange={(e) => setForm({ ...form, diagnosis: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500">Tratamiento</label>
+                <textarea
+                  className="w-full rounded border p-2 text-sm min-h-[60px]"
+                  value={form.treatment}
+                  onChange={(e) => setForm({ ...form, treatment: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500">Observaciones</label>
+                <textarea
+                  className="w-full rounded border p-2 text-sm min-h-[60px]"
+                  value={form.observations}
+                  onChange={(e) => setForm({ ...form, observations: e.target.value })}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={saveRecord}
+                  disabled={saving}
+                  className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                >
+                  {saving ? "Guardando..." : "Guardar consulta"}
+                </button>
+                <button
+                  onClick={() => { setShowForm(false); setEditingRecordId(null) }}
+                  className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
           )}
+
+          <div className="space-y-3 mt-4">
+            {records.length === 0 ? (
+              <p className="text-gray-400 text-sm">No hay consultas registradas aún.</p>
+            ) : (
+              records.map((record) => (
+                <div
+                  key={record.id}
+                  className="rounded-xl border p-4 space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700">
+                      Consulta {formatDate(record.consultation_date)}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => openEditForm(record)}
+                        className="text-xs text-gray-500 hover:text-black"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => deleteRecord(record.id)}
+                        className="text-xs text-red-400 hover:text-red-600"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+
+                  {record.chief_complaint && (
+                    <p className="text-sm"><span className="text-gray-500">Motivo:</span> {record.chief_complaint}</p>
+                  )}
+                  {record.diagnosis && (
+                    <p className="text-sm"><span className="text-gray-500">Diagnóstico:</span> {record.diagnosis}</p>
+                  )}
+                  {record.treatment && (
+                    <p className="text-sm"><span className="text-gray-500">Tratamiento:</span> {record.treatment}</p>
+                  )}
+                  {record.observations && (
+                    <p className="text-sm"><span className="text-gray-500">Observaciones:</span> {record.observations}</p>
+                  )}
+                  {record.next_followup && (
+                    <p className="text-sm"><span className="text-gray-500">Próxima revisión:</span> {formatDate(record.next_followup)}</p>
+                  )}
+
+                  <p className="text-xs text-gray-400 pt-1">
+                    Registrado por {record.created_by_email || "desconocido"}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   )
