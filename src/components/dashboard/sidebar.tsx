@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { FileSpreadsheet } from "lucide-react"
 
 import {
   LayoutDashboard,
@@ -13,6 +12,8 @@ import {
   Stethoscope,
   Users2,
   ScrollText,
+  FileSpreadsheet,
+  Settings,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
@@ -82,11 +83,17 @@ export default function Sidebar() {
       roles: ["admin"],
     },
     {
-  href: "/dashboard/reports",
-  label: "Reportes",
-  icon: FileSpreadsheet,
-  roles: ["admin"],
-  },
+      href: "/dashboard/reports",
+      label: "Reportes",
+      icon: FileSpreadsheet,
+      roles: ["admin"],
+    },
+    {
+      href: "/dashboard/settings",
+      label: "Configuración",
+      icon: Settings,
+      roles: ["admin"],
+    },
   ]
 
   const links = allLinks.filter((link) => link.roles.includes(role))
