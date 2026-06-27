@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import Link from "next/link"
 import jsPDF from "jspdf"
 import { supabase } from "@/lib/supabase"
+import { logActivity } from "@/lib/logActivity"
 
 type Service = {
   id: string
@@ -21,6 +22,15 @@ type TreatmentItem = {
   appointment_types: { name: string } | null
 }
 
+type Payment = {
+  id: string
+  amount: number
+  payment_date: string
+  payment_method: string
+  notes: string | null
+  receipt_number: string | null
+}
+
 type TreatmentPlan = {
   id: string
   title: string
@@ -28,6 +38,7 @@ type TreatmentPlan = {
   status: string
   created_at: string
   treatment_items: TreatmentItem[]
+  treatment_payments: Payment[]
 }
 
 const PLAN_STATUS_LABELS: Record<string, string> = {
@@ -50,9 +61,20 @@ const ITEM_STATUS_LABELS: Record<string, string> = {
   completed: "Completado",
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
+  transferencia: "Transferencia",
+}
+
+const FINANCIAL_STATUS_STYLES: Record<string, string> = {
+  "Pendiente": "bg-red-50 text-red-700 border-red-200",
+  "Pago Parcial": "bg-yellow-50 text-yellow-700 border-yellow-200",
+  "Pagado": "bg-green-50 text-green-700 border-green-200",
+}
+
 export default function TreatmentsPage() {
   const params = useParams()
-  const router = useRouter()
 
   const [patientName, setPatientName] = useState("")
   const [clinicId, setClinicId] = useState("")
@@ -65,6 +87,14 @@ export default function TreatmentsPage() {
   const [itemTooth, setItemTooth] = useState("")
   const [itemServiceId, setItemServiceId] = useState("")
   const [itemPrice, setItemPrice] = useState("")
+
+  // Formulario de pago, por plan abierto
+  const [openPaymentForm, setOpenPaymentForm] = useState<string | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState("efectivo")
+  const [paymentNotes, setPaymentNotes] = useState("")
+  const [paymentError, setPaymentError] = useState("")
+  const [savingPayment, setSavingPayment] = useState(false)
 
   useEffect(() => {
     if (params?.id) loadAll()
@@ -105,7 +135,7 @@ export default function TreatmentsPage() {
   const loadPlans = async () => {
     const { data } = await supabase
       .from("treatment_plans")
-      .select("*, treatment_items(*, appointment_types(name))")
+      .select("*, treatment_items(*, appointment_types(name)), treatment_payments(*)")
       .eq("patient_id", params.id)
       .order("created_at", { ascending: false })
 
@@ -204,7 +234,182 @@ export default function TreatmentsPage() {
     return Math.round((completed / items.length) * 100)
   }
 
-  // 👇 NUEVO — genera el PDF del presupuesto
+  // 👇 Cálculos financieros — siempre derivados, nunca guardados
+  const getTotalPaid = (plan: TreatmentPlan) =>
+    plan.treatment_payments.reduce((sum, p) => sum + p.amount, 0)
+
+  const getBalance = (plan: TreatmentPlan) =>
+    plan.total_amount - getTotalPaid(plan)
+
+  const getFinancialStatus = (plan: TreatmentPlan) => {
+    const paid = getTotalPaid(plan)
+    if (paid <= 0) return "Pendiente"
+    if (paid < plan.total_amount) return "Pago Parcial"
+    return "Pagado"
+  }
+
+  const openAddPayment = (planId: string) => {
+    setOpenPaymentForm(planId)
+    setPaymentAmount("")
+    setPaymentMethod("efectivo")
+    setPaymentNotes("")
+    setPaymentError("")
+  }
+
+  const addPayment = async (plan: TreatmentPlan) => {
+    const amount = parseFloat(paymentAmount)
+
+    if (!amount || amount <= 0) {
+      setPaymentError("El monto debe ser mayor a cero.")
+      return
+    }
+
+    const balance = getBalance(plan)
+    if (amount > balance) {
+      setPaymentError("El pago supera el saldo pendiente.")
+      return
+    }
+
+    setSavingPayment(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    const { data: receiptData } = await supabase.rpc("generate_receipt_number")
+
+    const { error } = await supabase.from("treatment_payments").insert({
+      treatment_plan_id: plan.id,
+      amount,
+      payment_method: paymentMethod,
+      notes: paymentNotes || null,
+      created_by: user?.id,
+      receipt_number: receiptData,
+    })
+
+    if (error) {
+      setPaymentError(error.message)
+      setSavingPayment(false)
+      return
+    }
+
+    await logActivity({
+      clinicId,
+      action: `registró un pago de $${amount} para`,
+      entityType: "payment",
+      details: patientName,
+    })
+
+    setSavingPayment(false)
+    setOpenPaymentForm(null)
+    loadPlans()
+  }
+
+  const deletePayment = async (paymentId: string, amount: number) => {
+    const confirm = window.confirm("¿Eliminar este pago? Esta acción no se puede deshacer.")
+    if (!confirm) return
+
+    await supabase.from("treatment_payments").delete().eq("id", paymentId)
+
+    await logActivity({
+      clinicId,
+      action: `eliminó un pago de $${amount} de`,
+      entityType: "payment",
+      details: patientName,
+    })
+
+    loadPlans()
+  }
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr + "T00:00:00").toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+
+  // 👇 Genera recibo PDF de un pago específico
+  const generateReceiptPDF = async (plan: TreatmentPlan, payment: Payment) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("clinic_id")
+      .eq("id", user?.id || "")
+      .single()
+
+    if (!profile) return
+
+    const { data: clinic } = await supabase
+      .from("clinics")
+      .select("*")
+      .eq("id", profile.clinic_id)
+      .single()
+
+    const doc = new jsPDF()
+    let y = 20
+
+    doc.setFontSize(18)
+    doc.setFont("helvetica", "bold")
+    doc.text(clinic?.name || "Clínica", 20, y)
+
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+    y += 7
+    if (clinic?.address) { doc.text(clinic.address, 20, y); y += 5 }
+    if (clinic?.phone) { doc.text(`Tel: ${clinic.phone}`, 20, y); y += 5 }
+    if (clinic?.email) { doc.text(clinic.email, 20, y); y += 5 }
+
+    y += 5
+    doc.setDrawColor(200)
+    doc.line(20, y, 190, y)
+    y += 10
+
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("Recibo de Pago", 20, y)
+    doc.setFontSize(11)
+    doc.text(payment.receipt_number || "—", 150, y)
+    y += 12
+
+    doc.setFontSize(11)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Paciente: ${patientName}`, 20, y)
+    y += 6
+    doc.text(`Tratamiento: ${plan.title}`, 20, y)
+    y += 6
+    doc.text(`Fecha de pago: ${formatDate(payment.payment_date)}`, 20, y)
+    y += 6
+    doc.text(`Método de pago: ${PAYMENT_METHOD_LABELS[payment.payment_method]}`, 20, y)
+    y += 12
+
+    doc.setDrawColor(200)
+    doc.line(20, y, 190, y)
+    y += 10
+
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "bold")
+    doc.text(`Monto pagado: $${payment.amount}`, 20, y)
+    y += 15
+
+    if (payment.notes) {
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+      doc.text(`Observaciones: ${payment.notes}`, 20, y)
+      y += 15
+    }
+
+    doc.setFontSize(9)
+    doc.setTextColor(150)
+    doc.text("Gracias por su pago.", 20, y)
+
+    doc.save(`recibo_${payment.receipt_number}.pdf`)
+
+    await logActivity({
+      clinicId,
+      action: `generó recibo ${payment.receipt_number} para`,
+      entityType: "payment",
+      details: patientName,
+    })
+  }
+
   const generateBudgetPDF = async (plan: TreatmentPlan) => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase
@@ -321,14 +526,17 @@ export default function TreatmentsPage() {
       ) : (
         plans.map((plan) => {
           const progress = getProgress(plan.treatment_items)
+          const totalPaid = getTotalPaid(plan)
+          const balance = getBalance(plan)
+          const financialStatus = getFinancialStatus(plan)
 
           return (
-            <div key={plan.id} className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+            <div key={plan.id} className="rounded-2xl border bg-white p-6 shadow-sm space-y-5">
 
+              {/* HEADER */}
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-xl font-bold">{plan.title}</h3>
-                  <p className="text-sm text-gray-500">Total: ${plan.total_amount}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -342,12 +550,11 @@ export default function TreatmentsPage() {
                     ))}
                   </select>
 
-                  {/* 👇 NUEVO — botón generar presupuesto */}
                   <button
                     onClick={() => generateBudgetPDF(plan)}
                     className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
                   >
-                    📄 Generar Presupuesto
+                    📄 Presupuesto
                   </button>
 
                   <button
@@ -359,9 +566,32 @@ export default function TreatmentsPage() {
                 </div>
               </div>
 
+              {/* RESUMEN FINANCIERO */}
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded-xl border bg-gray-50 p-3">
+                  <p className="text-xs text-gray-500">Total Tratamiento</p>
+                  <p className="text-lg font-bold">${plan.total_amount}</p>
+                </div>
+                <div className="rounded-xl border bg-gray-50 p-3">
+                  <p className="text-xs text-gray-500">Pagado</p>
+                  <p className="text-lg font-bold text-green-600">${totalPaid}</p>
+                </div>
+                <div className="rounded-xl border bg-gray-50 p-3">
+                  <p className="text-xs text-gray-500">Pendiente</p>
+                  <p className="text-lg font-bold text-red-600">${balance}</p>
+                </div>
+                <div className="rounded-xl border bg-gray-50 p-3 flex flex-col">
+                  <p className="text-xs text-gray-500">Estado</p>
+                  <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-xs font-medium w-fit ${FINANCIAL_STATUS_STYLES[financialStatus]}`}>
+                    {financialStatus}
+                  </span>
+                </div>
+              </div>
+
+              {/* PROGRESO DE PROCEDIMIENTOS */}
               <div>
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                  <span>Progreso</span>
+                  <span>Progreso de procedimientos</span>
                   <span>{progress}% completado</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
@@ -372,7 +602,9 @@ export default function TreatmentsPage() {
                 </div>
               </div>
 
+              {/* PROCEDIMIENTOS */}
               <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Procedimientos</p>
                 {plan.treatment_items.length === 0 ? (
                   <p className="text-gray-400 text-sm">Sin procedimientos aún.</p>
                 ) : (
@@ -463,6 +695,107 @@ export default function TreatmentsPage() {
                   className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
                 >
                   + Agregar procedimiento
+                </button>
+              )}
+
+              {/* HISTORIAL DE PAGOS */}
+              <div className="space-y-2 pt-2 border-t">
+                <p className="text-sm font-semibold text-gray-700 pt-2">Historial de Pagos</p>
+
+                {plan.treatment_payments.length === 0 ? (
+                  <p className="text-gray-400 text-sm">No hay pagos registrados aún.</p>
+                ) : (
+                  plan.treatment_payments
+                    .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
+                    .map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="flex items-center justify-between rounded-xl border p-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">
+                            {formatDate(payment.payment_date)} · {PAYMENT_METHOD_LABELS[payment.payment_method]}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            ${payment.amount}
+                            {payment.notes && <span> — {payment.notes}</span>}
+                          </p>
+                          <p className="text-xs text-gray-400">{payment.receipt_number}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => generateReceiptPDF(plan, payment)}
+                            className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
+                          >
+                            🧾 Recibo
+                          </button>
+                          <button
+                            onClick={() => deletePayment(payment.id, payment.amount)}
+                            className="text-xs text-red-400 hover:text-red-600"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+
+              {/* FORMULARIO AGREGAR PAGO */}
+              {openPaymentForm === plan.id ? (
+                <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <input
+                      className="rounded border p-2 text-sm"
+                      type="number"
+                      placeholder="Monto"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                    />
+                    <select
+                      className="rounded border p-2 text-sm"
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                    >
+                      <option value="efectivo">Efectivo</option>
+                      <option value="tarjeta">Tarjeta</option>
+                      <option value="transferencia">Transferencia</option>
+                    </select>
+                  </div>
+                  <input
+                    className="w-full rounded border p-2 text-sm"
+                    placeholder="Observaciones (opcional)"
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                  />
+
+                  {paymentError && (
+                    <p className="text-sm text-red-500">{paymentError}</p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => addPayment(plan)}
+                      disabled={savingPayment}
+                      className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                    >
+                      {savingPayment ? "Registrando..." : "Registrar Pago"}
+                    </button>
+                    <button
+                      onClick={() => setOpenPaymentForm(null)}
+                      className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => openAddPayment(plan.id)}
+                  className="rounded bg-black px-4 py-2 text-sm text-white"
+                >
+                  + Agregar Pago
                 </button>
               )}
             </div>

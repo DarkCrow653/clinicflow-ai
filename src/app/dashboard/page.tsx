@@ -14,6 +14,48 @@ type ServiceStat = {
   count: number
 }
 
+type TreatmentStat = {
+  name: string
+  count: number
+  revenue: number
+}
+
+type UpcomingAppointment = {
+  id: string
+  appointment_date: string
+  status: string
+  patients: { full_name: string } | null
+  appointment_types: { name: string } | null
+}
+
+type ActivityLog = {
+  id: string
+  action: string
+  details: string | null
+  created_at: string
+  user_email: string | null
+}
+
+type Alert = {
+  type: string
+  message: string
+  severity: "warning" | "danger"
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pendiente",
+  confirmed: "Confirmada",
+  completed: "Completada",
+  cancelled: "Cancelada",
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  confirmed: "bg-blue-50 text-blue-700 border-blue-200",
+  completed: "bg-green-50 text-green-700 border-green-200",
+  cancelled: "bg-red-50 text-red-700 border-red-200",
+}
+
 export default function DashboardPage() {
   const [role, setRole] = useState("")
   const [clinicName, setClinicName] = useState("")
@@ -26,6 +68,22 @@ export default function DashboardPage() {
   const [cancellationRate, setCancellationRate] = useState(0)
   const [newPatientsMonth, setNewPatientsMonth] = useState(0)
   const [topServices, setTopServices] = useState<ServiceStat[]>([])
+
+  const [activePatientsCount, setActivePatientsCount] = useState(0)
+  const [activeTreatmentsCount, setActiveTreatmentsCount] = useState(0)
+  const [monthlyPaymentIncome, setMonthlyPaymentIncome] = useState(0)
+  const [pendingBalanceTotal, setPendingBalanceTotal] = useState(0)
+  const [totalBilled, setTotalBilled] = useState(0)
+  const [totalCollected, setTotalCollected] = useState(0)
+  const [completedTreatmentsCount, setCompletedTreatmentsCount] = useState(0)
+  const [avgPerTreatment, setAvgPerTreatment] = useState(0)
+
+  const [topTreatments, setTopTreatments] = useState<TreatmentStat[]>([])
+  const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([])
+
+  // 👇 NUEVO — Bloque C
+  const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([])
+  const [alerts, setAlerts] = useState<Alert[]>([])
 
   useEffect(() => {
     loadDashboard()
@@ -94,7 +152,6 @@ export default function DashboardPage() {
     setTomorrowAppointments((tomorrowData as any[]) ?? [])
 
     if (profile.role === "admin") {
-      // INGRESOS HOY — citas completadas
       const { data: incomeTodayData } = await supabase
         .from("appointments")
         .select("price")
@@ -103,7 +160,6 @@ export default function DashboardPage() {
         .gte("appointment_date", `${today}T00:00:00`)
         .lte("appointment_date", `${today}T23:59:59`)
 
-      // 👇 NUEVO — ingresos de tratamientos dentales completados hoy
       const { data: treatmentIncomeTodayData } = await supabase
         .from("treatment_items")
         .select("price, treatment_plans!inner(clinic_id)")
@@ -124,7 +180,6 @@ export default function DashboardPage() {
         0
       ).toISOString().split("T")[0]
 
-      // INGRESOS DEL MES — citas completadas
       const { data: incomeMonthData } = await supabase
         .from("appointments")
         .select("price")
@@ -133,7 +188,6 @@ export default function DashboardPage() {
         .gte("appointment_date", `${firstDayMonth}T00:00:00`)
         .lte("appointment_date", `${lastDayMonth}T23:59:59`)
 
-      // 👇 NUEVO — ingresos de tratamientos dentales completados este mes
       const { data: treatmentIncomeMonthData } = await supabase
         .from("treatment_items")
         .select("price, treatment_plans!inner(clinic_id)")
@@ -186,6 +240,179 @@ export default function DashboardPage() {
 
         setTopServices(sorted)
       }
+
+      // Bloque A
+      const twelveMonthsAgo = new Date()
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+      const twelveMonthsAgoStr = twelveMonthsAgo.toISOString()
+
+      const { data: apPatients } = await supabase
+        .from("appointments")
+        .select("patient_id")
+        .eq("clinic_id", clinicId)
+        .gte("appointment_date", twelveMonthsAgoStr)
+
+      const { data: tpPatients } = await supabase
+        .from("treatment_plans")
+        .select("patient_id")
+        .eq("clinic_id", clinicId)
+        .gte("created_at", twelveMonthsAgoStr)
+
+      const activeIds = new Set([
+        ...(apPatients || []).map((a) => a.patient_id),
+        ...(tpPatients || []).map((t) => t.patient_id),
+      ])
+      setActivePatientsCount(activeIds.size)
+
+      const { data: allPlans } = await supabase
+        .from("treatment_plans")
+        .select("id, patient_id, status, total_amount, created_at, treatment_payments(amount, payment_date)")
+        .eq("clinic_id", clinicId)
+
+      if (allPlans) {
+        const activePlans = allPlans.filter((p) => p.status === "draft" || p.status === "active")
+        const completedPlans = allPlans.filter((p) => p.status === "completed")
+        const nonCancelledPlans = allPlans.filter((p) => p.status !== "cancelled")
+
+        setActiveTreatmentsCount(activePlans.length)
+        setCompletedTreatmentsCount(completedPlans.length)
+
+        const getPlanPaid = (plan: any) =>
+          (plan.treatment_payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
+
+        const pendingBalance = activePlans.reduce(
+          (sum, plan) => sum + (plan.total_amount - getPlanPaid(plan)), 0
+        )
+        setPendingBalanceTotal(pendingBalance)
+
+        const billed = nonCancelledPlans.reduce((sum, plan) => sum + plan.total_amount, 0)
+        setTotalBilled(billed)
+
+        const collected = allPlans.reduce((sum, plan) => sum + getPlanPaid(plan), 0)
+        setTotalCollected(collected)
+
+        setAvgPerTreatment(completedPlans.length > 0 ? Math.round(collected / completedPlans.length) : 0)
+
+        const monthStart = `${today.slice(0, 7)}-01`
+        const monthEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0]
+
+        let monthlyFromPayments = 0
+        allPlans.forEach((plan) => {
+          (plan.treatment_payments || []).forEach((payment: any) => {
+            if (payment.payment_date >= monthStart && payment.payment_date <= monthEnd) {
+              monthlyFromPayments += payment.amount
+            }
+          })
+        })
+        setMonthlyPaymentIncome(monthlyFromPayments)
+
+        // 👇 NUEVO — Bloque C: Alertas (usa allPlans ya cargado)
+        const newAlerts: Alert[] = []
+
+        const activePlansWithBalance = activePlans.filter((p) => {
+          const paid = getPlanPaid(p)
+          return p.total_amount - paid > 0
+        })
+
+        if (activePlansWithBalance.length > 0) {
+          newAlerts.push({
+            type: "balance",
+            message: `${activePlansWithBalance.length} tratamiento${activePlansWithBalance.length > 1 ? "s" : ""} con saldo pendiente`,
+            severity: "warning",
+          })
+        }
+
+        // Pacientes con tratamiento activo sin próxima cita
+        const uniquePatientIds = [...new Set(activePlans.map((p: any) => p.patient_id))]
+
+        if (uniquePatientIds.length > 0) {
+          const { data: futureAppointments } = await supabase
+            .from("appointments")
+            .select("patient_id")
+            .eq("clinic_id", clinicId)
+            .gte("appointment_date", new Date().toISOString())
+            .neq("status", "cancelled")
+
+          const patientsWithFutureAppt = new Set((futureAppointments || []).map((a) => a.patient_id))
+          const patientsWithoutNext = uniquePatientIds.filter((id) => !patientsWithFutureAppt.has(id))
+
+          if (patientsWithoutNext.length > 0) {
+            newAlerts.push({
+              type: "no_appointment",
+              message: `${patientsWithoutNext.length} paciente${patientsWithoutNext.length > 1 ? "s" : ""} con tratamiento activo sin próxima cita`,
+              severity: "danger",
+            })
+          }
+        }
+
+        // Presupuestos en borrador sin aprobar hace más de 7 días
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+        const draftPlans = allPlans.filter(
+          (p) => p.status === "draft" && new Date(p.created_at) <= sevenDaysAgo
+        )
+
+        if (draftPlans.length > 0) {
+          newAlerts.push({
+            type: "draft",
+            message: `${draftPlans.length} presupuesto${draftPlans.length > 1 ? "s" : ""} sin aprobar hace más de 7 días`,
+            severity: "warning",
+          })
+        }
+
+        setAlerts(newAlerts)
+      }
+
+      // Bloque B: Top Tratamientos
+      const { data: completedItems } = await supabase
+        .from("treatment_items")
+        .select("price, appointment_types(name), treatment_plans!inner(clinic_id)")
+        .eq("status", "completed")
+        .eq("treatment_plans.clinic_id", clinicId)
+
+      if (completedItems) {
+        const treatmentMap: Record<string, { count: number; revenue: number }> = {}
+
+        completedItems.forEach((item: any) => {
+          const name = item.appointment_types?.name
+          if (!name) return
+          if (!treatmentMap[name]) treatmentMap[name] = { count: 0, revenue: 0 }
+          treatmentMap[name].count += 1
+          treatmentMap[name].revenue += item.price || 0
+        })
+
+        const sortedTreatments = Object.entries(treatmentMap)
+          .map(([name, stats]) => ({ name, count: stats.count, revenue: stats.revenue }))
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5)
+
+        setTopTreatments(sortedTreatments)
+      }
+
+      // Bloque B: Próximas Citas
+      const nowIso = new Date().toISOString()
+
+      const { data: upcomingData } = await supabase
+        .from("appointments")
+        .select("id, appointment_date, status, patients(full_name), appointment_types(name)")
+        .eq("clinic_id", clinicId)
+        .neq("status", "cancelled")
+        .gte("appointment_date", nowIso)
+        .order("appointment_date", { ascending: true })
+        .limit(10)
+
+      if (upcomingData) setUpcomingAppointments(upcomingData as any[])
+
+      // 👇 NUEVO — Bloque C: Actividad reciente
+      const { data: activityData } = await supabase
+        .from("activity_logs_with_user")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+        .limit(20)
+
+      if (activityData) setRecentActivity(activityData)
     }
   }
 
@@ -193,6 +420,13 @@ export default function DashboardPage() {
     new Date(dateStr).toLocaleTimeString("es-ES", {
       hour: "2-digit",
       minute: "2-digit",
+    })
+
+  const formatFullDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     })
 
   const isAdmin = role === "admin"
@@ -280,6 +514,163 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* CENTRO DE CONTROL DENTAL */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold">Centro de Control Dental</h2>
+
+            <div className="grid gap-6 md:grid-cols-4">
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-gray-500 text-sm">Pacientes Activos</p>
+                <h2 className="mt-2 text-3xl font-bold">{activePatientsCount}</h2>
+                <p className="text-xs text-gray-400 mt-1">Últimos 12 meses</p>
+              </div>
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-gray-500 text-sm">Tratamientos Activos</p>
+                <h2 className="mt-2 text-3xl font-bold">{activeTreatmentsCount}</h2>
+                <p className="text-xs text-gray-400 mt-1">Borrador o en curso</p>
+              </div>
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-gray-500 text-sm">Ingresos del Mes</p>
+                <h2 className="mt-2 text-3xl font-bold">${monthlyPaymentIncome}</h2>
+                <p className="text-xs text-gray-400 mt-1">Pagos cobrados</p>
+              </div>
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-gray-500 text-sm">Saldo Pendiente</p>
+                <h2 className="mt-2 text-3xl font-bold text-red-600">${pendingBalanceTotal}</h2>
+                <p className="text-xs text-gray-400 mt-1">De tratamientos activos</p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-gray-500 text-sm">Tratamientos Completados</p>
+                <h2 className="mt-2 text-3xl font-bold">{completedTreatmentsCount}</h2>
+              </div>
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-gray-500 text-sm">Tratamientos Pendientes</p>
+                <h2 className="mt-2 text-3xl font-bold">{activeTreatmentsCount}</h2>
+              </div>
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-gray-500 text-sm">Tasa de Finalización</p>
+                <h2 className="mt-2 text-3xl font-bold">
+                  {completedTreatmentsCount + activeTreatmentsCount > 0
+                    ? Math.round((completedTreatmentsCount / (completedTreatmentsCount + activeTreatmentsCount)) * 100)
+                    : 0}%
+                </h2>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold mb-4">Resumen Financiero</h3>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div>
+                  <p className="text-xs text-gray-500">Total Facturado</p>
+                  <p className="text-xl font-bold">${totalBilled}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Total Cobrado</p>
+                  <p className="text-xl font-bold text-green-600">${totalCollected}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Total Pendiente</p>
+                  <p className="text-xl font-bold text-red-600">${totalBilled - totalCollected}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Promedio por Tratamiento</p>
+                  <p className="text-xl font-bold">${avgPerTreatment}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold mb-4">Top Tratamientos</h3>
+              {topTreatments.length === 0 ? (
+                <p className="text-gray-400 text-sm">Aún no hay procedimientos completados.</p>
+              ) : (
+                <div className="space-y-3">
+                  {topTreatments.map((t, index) => (
+                    <div key={t.name} className="flex items-center justify-between rounded-xl border p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-400 text-sm font-bold w-5">{index + 1}</span>
+                        <p className="font-medium">{t.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">${t.revenue}</p>
+                        <p className="text-xs text-gray-400">{t.count} realizado{t.count > 1 ? "s" : ""}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold mb-4">Próximas Citas</h3>
+              {upcomingAppointments.length === 0 ? (
+                <p className="text-gray-400 text-sm">No hay próximas citas programadas.</p>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingAppointments.map((apt) => (
+                    <div key={apt.id} className="flex items-center justify-between rounded-xl border p-3">
+                      <div>
+                        <p className="text-sm font-medium">{apt.patients?.full_name || "Sin nombre"}</p>
+                        <p className="text-xs text-gray-500">
+                          {formatFullDate(apt.appointment_date)} · {formatHour(apt.appointment_date)}
+                          {apt.appointment_types && <span> · {apt.appointment_types.name}</span>}
+                        </p>
+                      </div>
+                      <span className={`text-xs border rounded-full px-3 py-1 font-medium ${STATUS_STYLES[apt.status]}`}>
+                        {STATUS_LABELS[apt.status]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ALERTAS */}
+            {alerts.length > 0 && (
+              <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
+                <h3 className="text-lg font-bold">Alertas</h3>
+                {alerts.map((alert, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-xl border p-3 text-sm ${
+                      alert.severity === "danger"
+                        ? "bg-red-50 border-red-200 text-red-700"
+                        : "bg-yellow-50 border-yellow-200 text-yellow-700"
+                    }`}
+                  >
+                    {alert.severity === "danger" ? "🔴" : "🟡"} {alert.message}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ACTIVIDAD RECIENTE */}
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold mb-4">Actividad Reciente</h3>
+              {recentActivity.length === 0 ? (
+                <p className="text-gray-400 text-sm">No hay actividad registrada aún.</p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {recentActivity.map((log) => (
+                    <div key={log.id} className="flex items-start justify-between text-sm border-b pb-2 last:border-0">
+                      <p>
+                        <span className="font-medium">{log.user_email || "Usuario"}</span>
+                        {" "}{log.action}
+                        {log.details && <span className="text-gray-500"> — {log.details}</span>}
+                      </p>
+                      <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+                        {new Date(log.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}
