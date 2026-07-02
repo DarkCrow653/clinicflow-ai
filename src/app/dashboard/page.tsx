@@ -57,6 +57,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function DashboardPage() {
+  const [loading, setLoading] = useState(true) // 👈 NUEVO
   const [role, setRole] = useState("")
   const [clinicName, setClinicName] = useState("")
   const [totalPatients, setTotalPatients] = useState(0)
@@ -68,7 +69,6 @@ export default function DashboardPage() {
   const [cancellationRate, setCancellationRate] = useState(0)
   const [newPatientsMonth, setNewPatientsMonth] = useState(0)
   const [topServices, setTopServices] = useState<ServiceStat[]>([])
-
   const [activePatientsCount, setActivePatientsCount] = useState(0)
   const [activeTreatmentsCount, setActiveTreatmentsCount] = useState(0)
   const [monthlyPaymentIncome, setMonthlyPaymentIncome] = useState(0)
@@ -77,11 +77,8 @@ export default function DashboardPage() {
   const [totalCollected, setTotalCollected] = useState(0)
   const [completedTreatmentsCount, setCompletedTreatmentsCount] = useState(0)
   const [avgPerTreatment, setAvgPerTreatment] = useState(0)
-
   const [topTreatments, setTopTreatments] = useState<TreatmentStat[]>([])
   const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([])
-
-  // 👇 NUEVO — Bloque C
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
 
@@ -90,6 +87,8 @@ export default function DashboardPage() {
   }, [])
 
   const loadDashboard = async () => {
+    setLoading(true)
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -103,333 +102,225 @@ export default function DashboardPage() {
     const clinicId = profile.clinic_id
     setRole(profile.role)
 
-    const { data: clinic } = await supabase
-      .from("clinics")
-      .select("name")
-      .eq("id", clinicId)
-      .single()
-
-    if (clinic) setClinicName(clinic.name)
-
-    const { count: patientCount } = await supabase
-      .from("patients")
-      .select("*", { count: "exact", head: true })
-      .eq("clinic_id", clinicId)
-
-    setTotalPatients(patientCount || 0)
-
-    const { count: appointmentCount } = await supabase
-      .from("appointments")
-      .select("*", { count: "exact", head: true })
-      .eq("clinic_id", clinicId)
-
-    setTotalAppointments(appointmentCount || 0)
-
     const today = new Date().toISOString().split("T")[0]
-
-    const { data: todayData } = await supabase
-      .from("appointments")
-      .select("id, appointment_date, patients(full_name)")
-      .eq("clinic_id", clinicId)
-      .gte("appointment_date", `${today}T00:00:00`)
-      .lte("appointment_date", `${today}T23:59:59`)
-      .order("appointment_date", { ascending: true })
-
-    setTodayAppointments((todayData as any[]) ?? [])
-
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     const tomorrowStr = tomorrow.toISOString().split("T")[0]
+    const firstDayMonth = `${today.slice(0, 7)}-01`
+    const lastDayMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0]
+    const nowIso = new Date().toISOString()
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+    const twelveMonthsAgoStr = twelveMonthsAgo.toISOString()
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    const { data: tomorrowData } = await supabase
-      .from("appointments")
-      .select("id, appointment_date, patients(full_name)")
-      .eq("clinic_id", clinicId)
-      .gte("appointment_date", `${tomorrowStr}T00:00:00`)
-      .lte("appointment_date", `${tomorrowStr}T23:59:59`)
-      .order("appointment_date", { ascending: true })
+    // 👇 PARALELO 1 — consultas base (todos los roles)
+    const [
+      clinicRes,
+      patientCountRes,
+      appointmentCountRes,
+      todayRes,
+      tomorrowRes,
+    ] = await Promise.all([
+      supabase.from("clinics").select("name").eq("id", clinicId).single(),
+      supabase.from("patients").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId),
+      supabase.from("appointments").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId),
+      supabase.from("appointments").select("id, appointment_date, patients(full_name)").eq("clinic_id", clinicId).gte("appointment_date", `${today}T00:00:00`).lte("appointment_date", `${today}T23:59:59`).order("appointment_date", { ascending: true }),
+      supabase.from("appointments").select("id, appointment_date, patients(full_name)").eq("clinic_id", clinicId).gte("appointment_date", `${tomorrowStr}T00:00:00`).lte("appointment_date", `${tomorrowStr}T23:59:59`).order("appointment_date", { ascending: true }),
+    ])
 
-    setTomorrowAppointments((tomorrowData as any[]) ?? [])
+    if (clinicRes.data) setClinicName(clinicRes.data.name)
+    setTotalPatients(patientCountRes.count || 0)
+    setTotalAppointments(appointmentCountRes.count || 0)
+    setTodayAppointments((todayRes.data as any[]) ?? [])
+    setTomorrowAppointments((tomorrowRes.data as any[]) ?? [])
 
     if (profile.role === "admin") {
-      const { data: incomeTodayData } = await supabase
-        .from("appointments")
-        .select("price")
-        .eq("clinic_id", clinicId)
-        .eq("status", "completed")
-        .gte("appointment_date", `${today}T00:00:00`)
-        .lte("appointment_date", `${today}T23:59:59`)
+      // 👇 PARALELO 2 — todas las consultas de admin al mismo tiempo
+      const [
+        incomeTodayRes,
+        treatmentIncomeTodayRes,
+        incomeMonthRes,
+        treatmentIncomeMonthRes,
+        allAppointmentsRes,
+        newPatientsRes,
+        completedAptsRes,
+        apPatientsRes,
+        tpPatientsRes,
+        allPlansRes,
+        completedItemsRes,
+        upcomingRes,
+        activityRes,
+        futureAppointmentsRes,
+      ] = await Promise.all([
+        supabase.from("appointments").select("price").eq("clinic_id", clinicId).eq("status", "completed").gte("appointment_date", `${today}T00:00:00`).lte("appointment_date", `${today}T23:59:59`),
+        supabase.from("treatment_items").select("price, treatment_plans!inner(clinic_id)").eq("status", "completed").eq("treatment_plans.clinic_id", clinicId).gte("completed_at", `${today}T00:00:00`).lte("completed_at", `${today}T23:59:59`),
+        supabase.from("appointments").select("price").eq("clinic_id", clinicId).eq("status", "completed").gte("appointment_date", `${firstDayMonth}T00:00:00`).lte("appointment_date", `${lastDayMonth}T23:59:59`),
+        supabase.from("treatment_items").select("price, treatment_plans!inner(clinic_id)").eq("status", "completed").eq("treatment_plans.clinic_id", clinicId).gte("completed_at", `${firstDayMonth}T00:00:00`).lte("completed_at", `${lastDayMonth}T23:59:59`),
+        supabase.from("appointments").select("status").eq("clinic_id", clinicId),
+        supabase.from("patients").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId).gte("created_at", `${firstDayMonth}T00:00:00`),
+        supabase.from("appointments").select("appointment_types(name)").eq("clinic_id", clinicId).eq("status", "completed").not("appointment_type_id", "is", null),
+        supabase.from("appointments").select("patient_id").eq("clinic_id", clinicId).gte("appointment_date", twelveMonthsAgoStr),
+        supabase.from("treatment_plans").select("patient_id").eq("clinic_id", clinicId).gte("created_at", twelveMonthsAgoStr),
+        supabase.from("treatment_plans").select("id, patient_id, status, total_amount, created_at, treatment_payments(amount, payment_date)").eq("clinic_id", clinicId),
+        supabase.from("treatment_items").select("price, appointment_types(name), treatment_plans!inner(clinic_id)").eq("status", "completed").eq("treatment_plans.clinic_id", clinicId),
+        supabase.from("appointments").select("id, appointment_date, status, patients(full_name), appointment_types(name)").eq("clinic_id", clinicId).neq("status", "cancelled").gte("appointment_date", nowIso).order("appointment_date", { ascending: true }).limit(10),
+        supabase.from("activity_logs_with_user").select("*").eq("clinic_id", clinicId).order("created_at", { ascending: false }).limit(20),
+        supabase.from("appointments").select("patient_id").eq("clinic_id", clinicId).gte("appointment_date", nowIso).neq("status", "cancelled"),
+      ])
 
-      const { data: treatmentIncomeTodayData } = await supabase
-        .from("treatment_items")
-        .select("price, treatment_plans!inner(clinic_id)")
-        .eq("status", "completed")
-        .eq("treatment_plans.clinic_id", clinicId)
-        .gte("completed_at", `${today}T00:00:00`)
-        .lte("completed_at", `${today}T23:59:59`)
-
-      const appointmentIncomeToday = incomeTodayData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
-      const treatmentIncomeToday = treatmentIncomeTodayData?.reduce((sum, t) => sum + (t.price || 0), 0) ?? 0
-
+      // Ingresos hoy
+      const appointmentIncomeToday = incomeTodayRes.data?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
+      const treatmentIncomeToday = treatmentIncomeTodayRes.data?.reduce((sum, t) => sum + (t.price || 0), 0) ?? 0
       setIncomeToday(appointmentIncomeToday + treatmentIncomeToday)
 
-      const firstDayMonth = `${today.slice(0, 7)}-01`
-      const lastDayMonth = new Date(
-        new Date().getFullYear(),
-        new Date().getMonth() + 1,
-        0
-      ).toISOString().split("T")[0]
-
-      const { data: incomeMonthData } = await supabase
-        .from("appointments")
-        .select("price")
-        .eq("clinic_id", clinicId)
-        .eq("status", "completed")
-        .gte("appointment_date", `${firstDayMonth}T00:00:00`)
-        .lte("appointment_date", `${lastDayMonth}T23:59:59`)
-
-      const { data: treatmentIncomeMonthData } = await supabase
-        .from("treatment_items")
-        .select("price, treatment_plans!inner(clinic_id)")
-        .eq("status", "completed")
-        .eq("treatment_plans.clinic_id", clinicId)
-        .gte("completed_at", `${firstDayMonth}T00:00:00`)
-        .lte("completed_at", `${lastDayMonth}T23:59:59`)
-
-      const appointmentIncomeMonth = incomeMonthData?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
-      const treatmentIncomeMonth = treatmentIncomeMonthData?.reduce((sum, t) => sum + (t.price || 0), 0) ?? 0
-
+      // Ingresos mes
+      const appointmentIncomeMonth = incomeMonthRes.data?.reduce((sum, a) => sum + (a.price || 0), 0) ?? 0
+      const treatmentIncomeMonth = treatmentIncomeMonthRes.data?.reduce((sum, t) => sum + (t.price || 0), 0) ?? 0
       setIncomeMonth(appointmentIncomeMonth + treatmentIncomeMonth)
 
-      const { data: allAppointments } = await supabase
-        .from("appointments")
-        .select("status")
-        .eq("clinic_id", clinicId)
-
-      if (allAppointments && allAppointments.length > 0) {
-        const cancelled = allAppointments.filter((a) => a.status === "cancelled").length
-        setCancellationRate(Math.round((cancelled / allAppointments.length) * 100))
+      // Tasa cancelación
+      const allApts = allAppointmentsRes.data || []
+      if (allApts.length > 0) {
+        const cancelled = allApts.filter((a) => a.status === "cancelled").length
+        setCancellationRate(Math.round((cancelled / allApts.length) * 100))
       }
 
-      const { count: newPatients } = await supabase
-        .from("patients")
-        .select("*", { count: "exact", head: true })
-        .eq("clinic_id", clinicId)
-        .gte("created_at", `${firstDayMonth}T00:00:00`)
+      // Pacientes nuevos
+      setNewPatientsMonth(newPatientsRes.count || 0)
 
-      setNewPatientsMonth(newPatients || 0)
-
-      const { data: completedApts } = await supabase
-        .from("appointments")
-        .select("appointment_types(name)")
-        .eq("clinic_id", clinicId)
-        .eq("status", "completed")
-        .not("appointment_type_id", "is", null)
-
-      if (completedApts) {
+      // Top servicios (citas)
+      if (completedAptsRes.data) {
         const countMap: Record<string, number> = {}
-        completedApts.forEach((apt: any) => {
+        completedAptsRes.data.forEach((apt: any) => {
           const name = apt.appointment_types?.name
           if (name) countMap[name] = (countMap[name] || 0) + 1
         })
-
         const sorted = Object.entries(countMap)
           .map(([name, count]) => ({ name, count }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 5)
-
         setTopServices(sorted)
       }
 
-      // Bloque A
-      const twelveMonthsAgo = new Date()
-      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-      const twelveMonthsAgoStr = twelveMonthsAgo.toISOString()
-
-      const { data: apPatients } = await supabase
-        .from("appointments")
-        .select("patient_id")
-        .eq("clinic_id", clinicId)
-        .gte("appointment_date", twelveMonthsAgoStr)
-
-      const { data: tpPatients } = await supabase
-        .from("treatment_plans")
-        .select("patient_id")
-        .eq("clinic_id", clinicId)
-        .gte("created_at", twelveMonthsAgoStr)
-
+      // Pacientes activos
       const activeIds = new Set([
-        ...(apPatients || []).map((a) => a.patient_id),
-        ...(tpPatients || []).map((t) => t.patient_id),
+        ...(apPatientsRes.data || []).map((a) => a.patient_id),
+        ...(tpPatientsRes.data || []).map((t) => t.patient_id),
       ])
       setActivePatientsCount(activeIds.size)
 
-      const { data: allPlans } = await supabase
-        .from("treatment_plans")
-        .select("id, patient_id, status, total_amount, created_at, treatment_payments(amount, payment_date)")
-        .eq("clinic_id", clinicId)
+      // Planes de tratamiento
+      const allPlans = allPlansRes.data || []
+      const activePlans = allPlans.filter((p) => p.status === "draft" || p.status === "active")
+      const completedPlans = allPlans.filter((p) => p.status === "completed")
+      const nonCancelledPlans = allPlans.filter((p) => p.status !== "cancelled")
 
-      if (allPlans) {
-        const activePlans = allPlans.filter((p) => p.status === "draft" || p.status === "active")
-        const completedPlans = allPlans.filter((p) => p.status === "completed")
-        const nonCancelledPlans = allPlans.filter((p) => p.status !== "cancelled")
+      setActiveTreatmentsCount(activePlans.length)
+      setCompletedTreatmentsCount(completedPlans.length)
 
-        setActiveTreatmentsCount(activePlans.length)
-        setCompletedTreatmentsCount(completedPlans.length)
+      const getPlanPaid = (plan: any) =>
+        (plan.treatment_payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
 
-        const getPlanPaid = (plan: any) =>
-          (plan.treatment_payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
+      setPendingBalanceTotal(activePlans.reduce((sum, plan) => sum + (plan.total_amount - getPlanPaid(plan)), 0))
+      setTotalBilled(nonCancelledPlans.reduce((sum, plan) => sum + plan.total_amount, 0))
 
-        const pendingBalance = activePlans.reduce(
-          (sum, plan) => sum + (plan.total_amount - getPlanPaid(plan)), 0
-        )
-        setPendingBalanceTotal(pendingBalance)
+      const collected = allPlans.reduce((sum, plan) => sum + getPlanPaid(plan), 0)
+      setTotalCollected(collected)
+      setAvgPerTreatment(completedPlans.length > 0 ? Math.round(collected / completedPlans.length) : 0)
 
-        const billed = nonCancelledPlans.reduce((sum, plan) => sum + plan.total_amount, 0)
-        setTotalBilled(billed)
-
-        const collected = allPlans.reduce((sum, plan) => sum + getPlanPaid(plan), 0)
-        setTotalCollected(collected)
-
-        setAvgPerTreatment(completedPlans.length > 0 ? Math.round(collected / completedPlans.length) : 0)
-
-        const monthStart = `${today.slice(0, 7)}-01`
-        const monthEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0]
-
-        let monthlyFromPayments = 0
-        allPlans.forEach((plan) => {
-          (plan.treatment_payments || []).forEach((payment: any) => {
-            if (payment.payment_date >= monthStart && payment.payment_date <= monthEnd) {
-              monthlyFromPayments += payment.amount
-            }
-          })
-        })
-        setMonthlyPaymentIncome(monthlyFromPayments)
-
-        // 👇 NUEVO — Bloque C: Alertas (usa allPlans ya cargado)
-        const newAlerts: Alert[] = []
-
-        const activePlansWithBalance = activePlans.filter((p) => {
-          const paid = getPlanPaid(p)
-          return p.total_amount - paid > 0
-        })
-
-        if (activePlansWithBalance.length > 0) {
-          newAlerts.push({
-            type: "balance",
-            message: `${activePlansWithBalance.length} tratamiento${activePlansWithBalance.length > 1 ? "s" : ""} con saldo pendiente`,
-            severity: "warning",
-          })
-        }
-
-        // Pacientes con tratamiento activo sin próxima cita
-        const uniquePatientIds = [...new Set(activePlans.map((p: any) => p.patient_id))]
-
-        if (uniquePatientIds.length > 0) {
-          const { data: futureAppointments } = await supabase
-            .from("appointments")
-            .select("patient_id")
-            .eq("clinic_id", clinicId)
-            .gte("appointment_date", new Date().toISOString())
-            .neq("status", "cancelled")
-
-          const patientsWithFutureAppt = new Set((futureAppointments || []).map((a) => a.patient_id))
-          const patientsWithoutNext = uniquePatientIds.filter((id) => !patientsWithFutureAppt.has(id))
-
-          if (patientsWithoutNext.length > 0) {
-            newAlerts.push({
-              type: "no_appointment",
-              message: `${patientsWithoutNext.length} paciente${patientsWithoutNext.length > 1 ? "s" : ""} con tratamiento activo sin próxima cita`,
-              severity: "danger",
-            })
+      // Ingresos del mes desde pagos
+      let monthlyFromPayments = 0
+      allPlans.forEach((plan) => {
+        (plan.treatment_payments || []).forEach((payment: any) => {
+          if (payment.payment_date >= firstDayMonth && payment.payment_date <= lastDayMonth) {
+            monthlyFromPayments += payment.amount
           }
-        }
+        })
+      })
+      setMonthlyPaymentIncome(monthlyFromPayments)
 
-        // Presupuestos en borrador sin aprobar hace más de 7 días
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-        const draftPlans = allPlans.filter(
-          (p) => p.status === "draft" && new Date(p.created_at) <= sevenDaysAgo
-        )
-
-        if (draftPlans.length > 0) {
-          newAlerts.push({
-            type: "draft",
-            message: `${draftPlans.length} presupuesto${draftPlans.length > 1 ? "s" : ""} sin aprobar hace más de 7 días`,
-            severity: "warning",
-          })
-        }
-
-        setAlerts(newAlerts)
-      }
-
-      // Bloque B: Top Tratamientos
-      const { data: completedItems } = await supabase
-        .from("treatment_items")
-        .select("price, appointment_types(name), treatment_plans!inner(clinic_id)")
-        .eq("status", "completed")
-        .eq("treatment_plans.clinic_id", clinicId)
-
-      if (completedItems) {
+      // Top tratamientos dentales
+      if (completedItemsRes.data) {
         const treatmentMap: Record<string, { count: number; revenue: number }> = {}
-
-        completedItems.forEach((item: any) => {
+        completedItemsRes.data.forEach((item: any) => {
           const name = item.appointment_types?.name
           if (!name) return
           if (!treatmentMap[name]) treatmentMap[name] = { count: 0, revenue: 0 }
           treatmentMap[name].count += 1
           treatmentMap[name].revenue += item.price || 0
         })
-
         const sortedTreatments = Object.entries(treatmentMap)
           .map(([name, stats]) => ({ name, count: stats.count, revenue: stats.revenue }))
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 5)
-
         setTopTreatments(sortedTreatments)
       }
 
-      // Bloque B: Próximas Citas
-      const nowIso = new Date().toISOString()
+      // Próximas citas
+      if (upcomingRes.data) setUpcomingAppointments(upcomingRes.data as any[])
 
-      const { data: upcomingData } = await supabase
-        .from("appointments")
-        .select("id, appointment_date, status, patients(full_name), appointment_types(name)")
-        .eq("clinic_id", clinicId)
-        .neq("status", "cancelled")
-        .gte("appointment_date", nowIso)
-        .order("appointment_date", { ascending: true })
-        .limit(10)
+      // Actividad reciente
+      if (activityRes.data) setRecentActivity(activityRes.data)
 
-      if (upcomingData) setUpcomingAppointments(upcomingData as any[])
+      // Alertas
+      const newAlerts: Alert[] = []
 
-      // 👇 NUEVO — Bloque C: Actividad reciente
-      const { data: activityData } = await supabase
-        .from("activity_logs_with_user")
-        .select("*")
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
-        .limit(20)
+      const activePlansWithBalance = activePlans.filter((p) => p.total_amount - getPlanPaid(p) > 0)
+      if (activePlansWithBalance.length > 0) {
+        newAlerts.push({
+          type: "balance",
+          message: `${activePlansWithBalance.length} tratamiento${activePlansWithBalance.length > 1 ? "s" : ""} con saldo pendiente`,
+          severity: "warning",
+        })
+      }
 
-      if (activityData) setRecentActivity(activityData)
+      const uniquePatientIds = [...new Set(activePlans.map((p: any) => p.patient_id))]
+      const patientsWithFutureAppt = new Set((futureAppointmentsRes.data || []).map((a) => a.patient_id))
+      const patientsWithoutNext = uniquePatientIds.filter((id) => !patientsWithFutureAppt.has(id))
+      if (patientsWithoutNext.length > 0) {
+        newAlerts.push({
+          type: "no_appointment",
+          message: `${patientsWithoutNext.length} paciente${patientsWithoutNext.length > 1 ? "s" : ""} con tratamiento activo sin próxima cita`,
+          severity: "danger",
+        })
+      }
+
+      const draftPlans = allPlans.filter((p) => p.status === "draft" && new Date(p.created_at) <= sevenDaysAgo)
+      if (draftPlans.length > 0) {
+        newAlerts.push({
+          type: "draft",
+          message: `${draftPlans.length} presupuesto${draftPlans.length > 1 ? "s" : ""} sin aprobar hace más de 7 días`,
+          severity: "warning",
+        })
+      }
+
+      setAlerts(newAlerts)
     }
+
+    setLoading(false)
   }
 
   const formatHour = (dateStr: string) =>
-    new Date(dateStr).toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+    new Date(dateStr).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
 
   const formatFullDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
+    new Date(dateStr).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
 
   const isAdmin = role === "admin"
+
+  // 👇 NUEVO — pantalla de carga
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="space-y-3 text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-black border-t-transparent mx-auto" />
+          <p className="text-sm text-gray-500">Cargando dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8 p-10">
@@ -516,7 +407,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* CENTRO DE CONTROL DENTAL */}
           <div className="space-y-4">
             <h2 className="text-xl font-bold">Centro de Control Dental</h2>
 
@@ -630,7 +520,6 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* ALERTAS */}
             {alerts.length > 0 && (
               <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
                 <h3 className="text-lg font-bold">Alertas</h3>
@@ -649,7 +538,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* ACTIVIDAD RECIENTE */}
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <h3 className="text-lg font-bold mb-4">Actividad Reciente</h3>
               {recentActivity.length === 0 ? (
