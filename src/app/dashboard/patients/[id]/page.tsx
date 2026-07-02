@@ -34,13 +34,6 @@ const emptyForm = {
   next_followup: "",
 }
 
-const AI_ACTIONS = [
-  { type: "summary", label: "📝 Generar resumen clínico" },
-  { type: "evolution", label: "📋 Generar evolución profesional" },
-  { type: "patient_explanation", label: "👨‍⚕️ Explicar tratamiento al paciente" },
-  { type: "print_report", label: "📄 Preparar informe para impresión" },
-]
-
 export default function PatientDetailPage() {
   const params = useParams()
 
@@ -59,12 +52,6 @@ export default function PatientDetailPage() {
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
-
-  // 👇 NUEVO — Asistente IA
-  const [showAiMenu, setShowAiMenu] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiResult, setAiResult] = useState<string | null>(null)
-  const [aiActionLabel, setAiActionLabel] = useState("")
 
   useEffect(() => {
     if (params?.id) {
@@ -241,63 +228,6 @@ export default function PatientDetailPage() {
       year: "numeric",
     })
 
-  // 👇 NUEVO — Construye el contexto clínico y llama al asistente IA
-  const runAiAction = async (type: string, label: string) => {
-    if (!patient) return
-    setShowAiMenu(false)
-    setAiLoading(true)
-    setAiActionLabel(label)
-    setAiResult(null)
-
-    const context = records.length === 0
-      ? "No hay consultas registradas para este paciente."
-      : records.map((r) => `
-Fecha: ${formatDate(r.consultation_date)}
-Motivo: ${r.chief_complaint || "—"}
-Diagnóstico: ${r.diagnosis || "—"}
-Tratamiento: ${r.treatment || "—"}
-Observaciones: ${r.observations || "—"}
-Próxima revisión: ${r.next_followup ? formatDate(r.next_followup) : "—"}
-`).join("\n---\n")
-
-    const fullContent = `Paciente: ${patient.full_name}\n\nHistorial de consultas:\n${context}`
-
-    try {
-      const res = await fetch("/api/ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, content: fullContent }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setAiResult(`Error: ${data.error || "No se pudo generar el contenido."}`)
-      } else {
-        setAiResult(data.text)
-      }
-
-      await logActivity({
-        clinicId,
-        action: `usó el asistente IA (${label}) para`,
-        entityType: "patient",
-        entityId: patient.id,
-        details: patient.full_name,
-      })
-    } catch (err) {
-      setAiResult("Error de conexión. Intenta de nuevo.")
-    }
-
-    setAiLoading(false)
-  }
-
-  const copyAiResult = () => {
-    if (aiResult) {
-      navigator.clipboard.writeText(aiResult)
-      alert("¡Copiado al portapapeles!")
-    }
-  }
-
   if (!patient) return <div className="p-10">Cargando...</div>
 
   const canSeeClinicalData = role === "admin" || role === "doctor"
@@ -382,80 +312,15 @@ Próxima revisión: ${r.next_followup ? formatDate(r.next_followup) : "—"}
       {/* HISTORIAL CLÍNICO */}
       {canSeeClinicalData && (
         <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Historial Clínico</h2>
-
-            <div className="flex items-center gap-2">
-              {/* 👇 NUEVO — Botón Asistente IA */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowAiMenu(!showAiMenu)}
-                  className="rounded border border-purple-200 bg-purple-50 px-4 py-2 text-sm text-purple-700 hover:bg-purple-100"
-                >
-                  ✨ Asistente IA
-                </button>
-
-                {showAiMenu && (
-                  <div className="absolute right-0 mt-2 w-72 rounded-xl border bg-white shadow-lg z-10 overflow-hidden">
-                    {AI_ACTIONS.map((action) => (
-                      <button
-                        key={action.type}
-                        onClick={() => runAiAction(action.type, action.label)}
-                        className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-b last:border-0"
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={openNewForm}
-                className="rounded bg-black px-4 py-2 text-sm text-white"
-              >
-                + Nueva consulta
-              </button>
-            </div>
+            <button
+              onClick={openNewForm}
+              className="rounded bg-black px-4 py-2 text-sm text-white"
+            >
+              + Nueva consulta
+            </button>
           </div>
-
-          {/* 👇 NUEVO — Resultado del Asistente IA */}
-          {(aiLoading || aiResult) && (
-            <div className="rounded-xl border border-purple-200 bg-purple-50 p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-purple-800">
-                  ✨ {aiActionLabel}
-                </p>
-                <button
-                  onClick={() => { setAiResult(null); setAiLoading(false) }}
-                  className="text-xs text-purple-400 hover:text-purple-700"
-                >
-                  Cerrar
-                </button>
-              </div>
-
-              {aiLoading ? (
-                <p className="text-sm text-purple-600">Generando contenido...</p>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap bg-white rounded-lg p-4 border">
-                    {aiResult}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-purple-500">
-                      ⚠️ Generado por IA — revisa antes de usar
-                    </p>
-                    <button
-                      onClick={copyAiResult}
-                      className="rounded border px-3 py-1 text-xs hover:bg-white"
-                    >
-                      Copiar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
 
           {showForm && (
             <div className="rounded-xl border bg-gray-50 p-5 space-y-3">
@@ -544,10 +409,7 @@ Próxima revisión: ${r.next_followup ? formatDate(r.next_followup) : "—"}
               <p className="text-gray-400 text-sm">No hay consultas registradas aún.</p>
             ) : (
               records.map((record) => (
-                <div
-                  key={record.id}
-                  className="rounded-xl border p-4 space-y-2"
-                >
+                <div key={record.id} className="rounded-xl border p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-700">
                       Consulta {formatDate(record.consultation_date)}
