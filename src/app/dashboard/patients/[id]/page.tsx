@@ -25,6 +25,16 @@ type PatientRecord = {
   created_at: string
 }
 
+type PatientErrors = {
+  editName?: string
+  editPhone?: string
+}
+
+type RecordErrors = {
+  consultation_date?: string
+  chief_complaint?: string
+}
+
 const emptyForm = {
   consultation_date: new Date().toISOString().split("T")[0],
   chief_complaint: "",
@@ -47,10 +57,13 @@ export default function PatientDetailPage() {
   const [editName, setEditName] = useState("")
   const [editPhone, setEditPhone] = useState("")
   const [editEmail, setEditEmail] = useState("")
+  const [patientErrors, setPatientErrors] = useState<PatientErrors>({})
+  const [savingPatient, setSavingPatient] = useState(false)
 
   const [showForm, setShowForm] = useState(false)
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [recordErrors, setRecordErrors] = useState<RecordErrors>({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -101,16 +114,39 @@ export default function PatientDetailPage() {
     if (data) setRecords(data)
   }
 
+  // 👇 NUEVO — validación datos del paciente
+  const validatePatient = (): boolean => {
+    const newErrors: PatientErrors = {}
+
+    if (!editName.trim()) {
+      newErrors.editName = "El nombre es obligatorio."
+    } else if (editName.trim().length < 3) {
+      newErrors.editName = "El nombre debe tener al menos 3 caracteres."
+    }
+
+    if (editPhone && editPhone.replace(/[^0-9]/g, "").length < 7) {
+      newErrors.editPhone = "El teléfono debe tener al menos 7 dígitos."
+    }
+
+    setPatientErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const savePatient = async () => {
-    if (!patient) return
+    if (!patient || !validatePatient()) return
+    setSavingPatient(true)
 
     const { error } = await supabase
       .from("patients")
-      .update({ full_name: editName, phone: editPhone, email: editEmail })
+      .update({ full_name: editName.trim(), phone: editPhone, email: editEmail })
       .eq("id", String(patient.id))
       .select()
 
-    if (error) { alert(error.message); return }
+    if (error) {
+      setPatientErrors({ editName: "Error al guardar. Intenta de nuevo." })
+      setSavingPatient(false)
+      return
+    }
 
     await logActivity({
       clinicId,
@@ -120,12 +156,15 @@ export default function PatientDetailPage() {
       details: editName,
     })
 
-    setPatient({ ...patient, full_name: editName, phone: editPhone, email: editEmail })
+    setPatient({ ...patient, full_name: editName.trim(), phone: editPhone, email: editEmail })
+    setPatientErrors({})
+    setSavingPatient(false)
     setIsEditing(false)
   }
 
   const openNewForm = () => {
     setForm(emptyForm)
+    setRecordErrors({})
     setEditingRecordId(null)
     setShowForm(true)
   }
@@ -139,12 +178,29 @@ export default function PatientDetailPage() {
       observations: record.observations || "",
       next_followup: record.next_followup || "",
     })
+    setRecordErrors({})
     setEditingRecordId(record.id)
     setShowForm(true)
   }
 
+  // 👇 NUEVO — validación consulta clínica
+  const validateRecord = (): boolean => {
+    const newErrors: RecordErrors = {}
+
+    if (!form.consultation_date) {
+      newErrors.consultation_date = "La fecha de consulta es obligatoria."
+    }
+
+    if (!form.chief_complaint.trim()) {
+      newErrors.chief_complaint = "El motivo de consulta es obligatorio."
+    }
+
+    setRecordErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const saveRecord = async () => {
-    if (!patient) return
+    if (!patient || !validateRecord()) return
     setSaving(true)
 
     if (editingRecordId) {
@@ -199,6 +255,7 @@ export default function PatientDetailPage() {
 
     setSaving(false)
     setShowForm(false)
+    setRecordErrors({})
     setEditingRecordId(null)
     loadRecords()
   }
@@ -239,34 +296,57 @@ export default function PatientDetailPage() {
       <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
         {isEditing ? (
           <div className="space-y-3">
-            <input
-              className="w-full rounded border p-2 text-xl font-bold"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              placeholder="Nombre completo"
-            />
-            <input
-              className="w-full rounded border p-2"
-              value={editPhone}
-              type="tel"
-              onChange={(e) => setEditPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
-              placeholder="Teléfono"
-            />
+
+            {/* NOMBRE */}
+            <div>
+              <input
+                className={`w-full rounded border p-2 text-xl font-bold ${patientErrors.editName ? "border-red-400 bg-red-50" : ""}`}
+                value={editName}
+                onChange={(e) => {
+                  setEditName(e.target.value)
+                  if (patientErrors.editName) setPatientErrors((prev) => ({ ...prev, editName: undefined }))
+                }}
+                placeholder="Nombre completo *"
+              />
+              {patientErrors.editName && (
+                <p className="mt-1 text-xs text-red-500">{patientErrors.editName}</p>
+              )}
+            </div>
+
+            {/* TELÉFONO */}
+            <div>
+              <input
+                className={`w-full rounded border p-2 ${patientErrors.editPhone ? "border-red-400 bg-red-50" : ""}`}
+                value={editPhone}
+                type="tel"
+                onChange={(e) => {
+                  setEditPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))
+                  if (patientErrors.editPhone) setPatientErrors((prev) => ({ ...prev, editPhone: undefined }))
+                }}
+                placeholder="Teléfono"
+              />
+              {patientErrors.editPhone && (
+                <p className="mt-1 text-xs text-red-500">{patientErrors.editPhone}</p>
+              )}
+            </div>
+
             <input
               className="w-full rounded border p-2"
               value={editEmail}
               onChange={(e) => setEditEmail(e.target.value)}
               placeholder="Email"
             />
+
             <div className="flex gap-2">
               <button
                 onClick={savePatient}
-                className="rounded bg-black px-4 py-2 text-white"
+                disabled={savingPatient}
+                className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
               >
-                Guardar cambios
+                {savingPatient ? "Guardando..." : "Guardar cambios"}
               </button>
               <button
-                onClick={() => setIsEditing(false)}
+                onClick={() => { setIsEditing(false); setPatientErrors({}) }}
                 className="rounded border px-4 py-2 text-gray-600 hover:bg-gray-50"
               >
                 Cancelar
@@ -295,7 +375,6 @@ export default function PatientDetailPage() {
                   >
                     🦷 Ver odontograma
                   </Link>
-
                   <Link
                     href={`/dashboard/patients/${patient.id}/treatments`}
                     className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
@@ -329,15 +408,23 @@ export default function PatientDetailPage() {
               </h3>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {/* FECHA CONSULTA */}
                 <div>
-                  <label className="text-xs text-gray-500">Fecha de consulta</label>
+                  <label className="text-xs text-gray-500">Fecha de consulta *</label>
                   <input
                     type="date"
-                    className="w-full rounded border p-2 text-sm"
+                    className={`w-full rounded border p-2 text-sm ${recordErrors.consultation_date ? "border-red-400 bg-red-50" : ""}`}
                     value={form.consultation_date}
-                    onChange={(e) => setForm({ ...form, consultation_date: e.target.value })}
+                    onChange={(e) => {
+                      setForm({ ...form, consultation_date: e.target.value })
+                      if (recordErrors.consultation_date) setRecordErrors((prev) => ({ ...prev, consultation_date: undefined }))
+                    }}
                   />
+                  {recordErrors.consultation_date && (
+                    <p className="mt-1 text-xs text-red-500">{recordErrors.consultation_date}</p>
+                  )}
                 </div>
+
                 <div>
                   <label className="text-xs text-gray-500">Próxima revisión (opcional)</label>
                   <input
@@ -349,14 +436,21 @@ export default function PatientDetailPage() {
                 </div>
               </div>
 
+              {/* MOTIVO */}
               <div>
-                <label className="text-xs text-gray-500">Motivo de consulta</label>
+                <label className="text-xs text-gray-500">Motivo de consulta *</label>
                 <textarea
-                  className="w-full rounded border p-2 text-sm min-h-[60px]"
+                  className={`w-full rounded border p-2 text-sm min-h-[60px] ${recordErrors.chief_complaint ? "border-red-400 bg-red-50" : ""}`}
                   value={form.chief_complaint}
-                  onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })}
-                  placeholder="¿Por qué vino el paciente?"
+                  onChange={(e) => {
+                    setForm({ ...form, chief_complaint: e.target.value })
+                    if (recordErrors.chief_complaint) setRecordErrors((prev) => ({ ...prev, chief_complaint: undefined }))
+                  }}
+                  placeholder="¿Por qué vino el paciente? *"
                 />
+                {recordErrors.chief_complaint && (
+                  <p className="mt-1 text-xs text-red-500">{recordErrors.chief_complaint}</p>
+                )}
               </div>
 
               <div>
@@ -395,7 +489,7 @@ export default function PatientDetailPage() {
                   {saving ? "Guardando..." : "Guardar consulta"}
                 </button>
                 <button
-                  onClick={() => { setShowForm(false); setEditingRecordId(null) }}
+                  onClick={() => { setShowForm(false); setEditingRecordId(null); setRecordErrors({}) }}
                   className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
                 >
                   Cancelar

@@ -41,6 +41,15 @@ type TreatmentPlan = {
   treatment_payments: Payment[]
 }
 
+type ItemErrors = {
+  serviceId?: string
+  price?: string
+}
+
+type PlanErrors = {
+  title?: string
+}
+
 const PLAN_STATUS_LABELS: Record<string, string> = {
   draft: "Borrador",
   active: "Activo",
@@ -82,13 +91,16 @@ export default function TreatmentsPage() {
   const [plans, setPlans] = useState<TreatmentPlan[]>([])
 
   const [newPlanTitle, setNewPlanTitle] = useState("")
+  const [planErrors, setPlanErrors] = useState<PlanErrors>({})
+  const [savingPlan, setSavingPlan] = useState(false)
 
   const [openItemForm, setOpenItemForm] = useState<string | null>(null)
   const [itemTooth, setItemTooth] = useState("")
   const [itemServiceId, setItemServiceId] = useState("")
   const [itemPrice, setItemPrice] = useState("")
+  const [itemErrors, setItemErrors] = useState<ItemErrors>({})
+  const [savingItem, setSavingItem] = useState(false)
 
-  // Formulario de pago, por plan abierto
   const [openPaymentForm, setOpenPaymentForm] = useState<string | null>(null)
   const [paymentAmount, setPaymentAmount] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("efectivo")
@@ -142,8 +154,21 @@ export default function TreatmentsPage() {
     if (data) setPlans(data as TreatmentPlan[])
   }
 
+  // 👇 NUEVO — validar plan
+  const validatePlan = (): boolean => {
+    const newErrors: PlanErrors = {}
+    if (!newPlanTitle.trim()) {
+      newErrors.title = "El nombre del plan es obligatorio."
+    } else if (newPlanTitle.trim().length < 3) {
+      newErrors.title = "El nombre debe tener al menos 3 caracteres."
+    }
+    setPlanErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const createPlan = async () => {
-    if (!newPlanTitle.trim()) return
+    if (!validatePlan()) return
+    setSavingPlan(true)
 
     await supabase.from("treatment_plans").insert({
       patient_id: params.id,
@@ -154,6 +179,8 @@ export default function TreatmentsPage() {
     })
 
     setNewPlanTitle("")
+    setPlanErrors({})
+    setSavingPlan(false)
     loadPlans()
   }
 
@@ -165,13 +192,13 @@ export default function TreatmentsPage() {
   const deletePlan = async (planId: string) => {
     const confirm = window.confirm("¿Eliminar este plan de tratamiento y todos sus procedimientos?")
     if (!confirm) return
-
     await supabase.from("treatment_plans").delete().eq("id", planId)
     loadPlans()
   }
 
   const handleServiceChange = (serviceId: string) => {
     setItemServiceId(serviceId)
+    if (itemErrors.serviceId) setItemErrors((prev) => ({ ...prev, serviceId: undefined }))
     const service = services.find((s) => s.id === serviceId)
     if (service) setItemPrice(String(service.price))
   }
@@ -183,15 +210,28 @@ export default function TreatmentsPage() {
       .eq("treatment_plan_id", planId)
 
     const total = (data || []).reduce((sum, i) => sum + (i.price || 0), 0)
+    await supabase.from("treatment_plans").update({ total_amount: total }).eq("id", planId)
+  }
 
-    await supabase
-      .from("treatment_plans")
-      .update({ total_amount: total })
-      .eq("id", planId)
+  // 👇 NUEVO — validar procedimiento
+  const validateItem = (): boolean => {
+    const newErrors: ItemErrors = {}
+
+    if (!itemServiceId) newErrors.serviceId = "Selecciona un servicio."
+
+    if (!itemPrice) {
+      newErrors.price = "El precio es obligatorio."
+    } else if (parseFloat(itemPrice) <= 0) {
+      newErrors.price = "El precio debe ser mayor a cero."
+    }
+
+    setItemErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   const addItem = async (planId: string) => {
-    if (!itemServiceId || !itemPrice) return
+    if (!validateItem()) return
+    setSavingItem(true)
 
     await supabase.from("treatment_items").insert({
       treatment_plan_id: planId,
@@ -206,6 +246,8 @@ export default function TreatmentsPage() {
     setItemTooth("")
     setItemServiceId("")
     setItemPrice("")
+    setItemErrors({})
+    setSavingItem(false)
     setOpenItemForm(null)
     loadPlans()
   }
@@ -218,7 +260,6 @@ export default function TreatmentsPage() {
         completed_at: status === "completed" ? new Date().toISOString() : null,
       })
       .eq("id", itemId)
-
     loadPlans()
   }
 
@@ -234,7 +275,6 @@ export default function TreatmentsPage() {
     return Math.round((completed / items.length) * 100)
   }
 
-  // 👇 Cálculos financieros — siempre derivados, nunca guardados
   const getTotalPaid = (plan: TreatmentPlan) =>
     plan.treatment_payments.reduce((sum, p) => sum + p.amount, 0)
 
@@ -256,24 +296,35 @@ export default function TreatmentsPage() {
     setPaymentError("")
   }
 
+  // 👇 NUEVO — validación de pago mejorada
   const addPayment = async (plan: TreatmentPlan) => {
     const amount = parseFloat(paymentAmount)
 
-    if (!amount || amount <= 0) {
+    if (!paymentAmount.trim()) {
+      setPaymentError("El monto es obligatorio.")
+      return
+    }
+
+    if (isNaN(amount) || amount <= 0) {
       setPaymentError("El monto debe ser mayor a cero.")
       return
     }
 
     const balance = getBalance(plan)
+
+    if (balance <= 0) {
+      setPaymentError("Este plan ya está completamente pagado.")
+      return
+    }
+
     if (amount > balance) {
-      setPaymentError("El pago supera el saldo pendiente.")
+      setPaymentError(`El pago ($${amount}) supera el saldo pendiente ($${balance}).`)
       return
     }
 
     setSavingPayment(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-
     const { data: receiptData } = await supabase.rpc("generate_receipt_number")
 
     const { error } = await supabase.from("treatment_payments").insert({
@@ -326,7 +377,6 @@ export default function TreatmentsPage() {
       year: "numeric",
     })
 
-  // 👇 Genera recibo PDF de un pago específico
   const generateReceiptPDF = async (plan: TreatmentPlan, payment: Payment) => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase
@@ -349,57 +399,42 @@ export default function TreatmentsPage() {
     doc.setFontSize(18)
     doc.setFont("helvetica", "bold")
     doc.text(clinic?.name || "Clínica", 20, y)
-
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
     y += 7
     if (clinic?.address) { doc.text(clinic.address, 20, y); y += 5 }
     if (clinic?.phone) { doc.text(`Tel: ${clinic.phone}`, 20, y); y += 5 }
     if (clinic?.email) { doc.text(clinic.email, 20, y); y += 5 }
-
     y += 5
     doc.setDrawColor(200)
     doc.line(20, y, 190, y)
     y += 10
-
     doc.setFontSize(14)
     doc.setFont("helvetica", "bold")
     doc.text("Recibo de Pago", 20, y)
     doc.setFontSize(11)
     doc.text(payment.receipt_number || "—", 150, y)
     y += 12
-
     doc.setFontSize(11)
     doc.setFont("helvetica", "normal")
-    doc.text(`Paciente: ${patientName}`, 20, y)
-    y += 6
-    doc.text(`Tratamiento: ${plan.title}`, 20, y)
-    y += 6
-    doc.text(`Fecha de pago: ${formatDate(payment.payment_date)}`, 20, y)
-    y += 6
-    doc.text(`Método de pago: ${PAYMENT_METHOD_LABELS[payment.payment_method]}`, 20, y)
-    y += 12
-
+    doc.text(`Paciente: ${patientName}`, 20, y); y += 6
+    doc.text(`Tratamiento: ${plan.title}`, 20, y); y += 6
+    doc.text(`Fecha de pago: ${formatDate(payment.payment_date)}`, 20, y); y += 6
+    doc.text(`Método de pago: ${PAYMENT_METHOD_LABELS[payment.payment_method]}`, 20, y); y += 12
     doc.setDrawColor(200)
     doc.line(20, y, 190, y)
     y += 10
-
     doc.setFontSize(16)
     doc.setFont("helvetica", "bold")
-    doc.text(`Monto pagado: $${payment.amount}`, 20, y)
-    y += 15
-
+    doc.text(`Monto pagado: $${payment.amount}`, 20, y); y += 15
     if (payment.notes) {
       doc.setFontSize(10)
       doc.setFont("helvetica", "normal")
-      doc.text(`Observaciones: ${payment.notes}`, 20, y)
-      y += 15
+      doc.text(`Observaciones: ${payment.notes}`, 20, y); y += 15
     }
-
     doc.setFontSize(9)
     doc.setTextColor(150)
     doc.text("Gracias por su pago.", 20, y)
-
     doc.save(`recibo_${payment.receipt_number}.pdf`)
 
     await logActivity({
@@ -428,37 +463,27 @@ export default function TreatmentsPage() {
 
     const doc = new jsPDF()
     let y = 20
-
     doc.setFontSize(18)
     doc.setFont("helvetica", "bold")
     doc.text(clinic?.name || "Clínica", 20, y)
-
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
     y += 7
     if (clinic?.address) { doc.text(clinic.address, 20, y); y += 5 }
     if (clinic?.phone) { doc.text(`Tel: ${clinic.phone}`, 20, y); y += 5 }
     if (clinic?.email) { doc.text(clinic.email, 20, y); y += 5 }
-
     y += 5
     doc.setDrawColor(200)
     doc.line(20, y, 190, y)
     y += 10
-
     doc.setFontSize(14)
     doc.setFont("helvetica", "bold")
-    doc.text("Presupuesto de Tratamiento", 20, y)
-    y += 10
-
+    doc.text("Presupuesto de Tratamiento", 20, y); y += 10
     doc.setFontSize(11)
     doc.setFont("helvetica", "normal")
-    doc.text(`Paciente: ${patientName}`, 20, y)
-    y += 6
-    doc.text(`Plan: ${plan.title}`, 20, y)
-    y += 6
-    doc.text(`Fecha: ${new Date().toLocaleDateString("es-ES")}`, 20, y)
-    y += 12
-
+    doc.text(`Paciente: ${patientName}`, 20, y); y += 6
+    doc.text(`Plan: ${plan.title}`, 20, y); y += 6
+    doc.text(`Fecha: ${new Date().toLocaleDateString("es-ES")}`, 20, y); y += 12
     doc.setFont("helvetica", "bold")
     doc.text("Procedimiento", 20, y)
     doc.text("Pieza", 120, y)
@@ -466,7 +491,6 @@ export default function TreatmentsPage() {
     y += 3
     doc.line(20, y, 190, y)
     y += 7
-
     doc.setFont("helvetica", "normal")
     plan.treatment_items.forEach((item) => {
       doc.text(item.appointment_types?.name || "Servicio", 20, y)
@@ -474,20 +498,17 @@ export default function TreatmentsPage() {
       doc.text(`$${item.price}`, 165, y)
       y += 7
     })
-
     y += 3
     doc.line(20, y, 190, y)
     y += 8
     doc.setFont("helvetica", "bold")
     doc.setFontSize(13)
     doc.text(`Total: $${plan.total_amount}`, 150, y)
-
     y += 20
     doc.setFontSize(9)
     doc.setFont("helvetica", "normal")
     doc.setTextColor(150)
     doc.text("Este presupuesto es una estimación y puede variar según evolución del tratamiento.", 20, y)
-
     doc.save(`presupuesto_${patientName.replace(/\s/g, "_")}_${Date.now()}.pdf`)
   }
 
@@ -503,20 +524,28 @@ export default function TreatmentsPage() {
       {/* NUEVO PLAN */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
         <h2 className="text-lg font-bold">Nuevo plan de tratamiento</h2>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 rounded border p-2 text-sm"
-            placeholder="Ej. Plan Dental Integral"
-            value={newPlanTitle}
-            onChange={(e) => setNewPlanTitle(e.target.value)}
-          />
-          <button
-            onClick={createPlan}
-            disabled={!newPlanTitle.trim()}
-            className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
-            Crear plan
-          </button>
+        <div>
+          <div className="flex gap-2">
+            <input
+              className={`flex-1 rounded border p-2 text-sm ${planErrors.title ? "border-red-400 bg-red-50" : ""}`}
+              placeholder="Ej. Plan Dental Integral *"
+              value={newPlanTitle}
+              onChange={(e) => {
+                setNewPlanTitle(e.target.value)
+                if (planErrors.title) setPlanErrors({})
+              }}
+            />
+            <button
+              onClick={createPlan}
+              disabled={savingPlan}
+              className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+            >
+              {savingPlan ? "Creando..." : "Crear plan"}
+            </button>
+          </div>
+          {planErrors.title && (
+            <p className="mt-1 text-xs text-red-500">{planErrors.title}</p>
+          )}
         </div>
       </div>
 
@@ -533,12 +562,10 @@ export default function TreatmentsPage() {
           return (
             <div key={plan.id} className="rounded-2xl border bg-white p-6 shadow-sm space-y-5">
 
-              {/* HEADER */}
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-xl font-bold">{plan.title}</h3>
                 </div>
-
                 <div className="flex items-center gap-2">
                   <select
                     value={plan.status}
@@ -549,14 +576,12 @@ export default function TreatmentsPage() {
                       <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
-
                   <button
                     onClick={() => generateBudgetPDF(plan)}
                     className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
                   >
                     📄 Presupuesto
                   </button>
-
                   <button
                     onClick={() => deletePlan(plan.id)}
                     className="rounded border border-red-200 px-3 py-1 text-xs text-red-500 hover:bg-red-50"
@@ -566,7 +591,6 @@ export default function TreatmentsPage() {
                 </div>
               </div>
 
-              {/* RESUMEN FINANCIERO */}
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <div className="rounded-xl border bg-gray-50 p-3">
                   <p className="text-xs text-gray-500">Total Tratamiento</p>
@@ -588,7 +612,6 @@ export default function TreatmentsPage() {
                 </div>
               </div>
 
-              {/* PROGRESO DE PROCEDIMIENTOS */}
               <div>
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                   <span>Progreso de procedimientos</span>
@@ -602,17 +625,13 @@ export default function TreatmentsPage() {
                 </div>
               </div>
 
-              {/* PROCEDIMIENTOS */}
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700">Procedimientos</p>
                 {plan.treatment_items.length === 0 ? (
                   <p className="text-gray-400 text-sm">Sin procedimientos aún.</p>
                 ) : (
                   plan.treatment_items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between rounded-xl border p-3"
-                    >
+                    <div key={item.id} className="flex items-center justify-between rounded-xl border p-3">
                       <div>
                         <p className="text-sm font-medium">
                           {item.appointment_types?.name || "Servicio"}
@@ -622,7 +641,6 @@ export default function TreatmentsPage() {
                         </p>
                         <p className="text-xs text-gray-500">${item.price}</p>
                       </div>
-
                       <div className="flex items-center gap-2">
                         <select
                           value={item.status}
@@ -633,7 +651,6 @@ export default function TreatmentsPage() {
                             <option key={value} value={value}>{label}</option>
                           ))}
                         </select>
-
                         <button
                           onClick={() => deleteItem(item.id, plan.id)}
                           className="text-xs text-red-400 hover:text-red-600"
@@ -655,34 +672,48 @@ export default function TreatmentsPage() {
                       value={itemTooth}
                       onChange={(e) => setItemTooth(e.target.value.replace(/[^0-9]/g, ""))}
                     />
-                    <select
-                      className="rounded border p-2 text-sm"
-                      value={itemServiceId}
-                      onChange={(e) => handleServiceChange(e.target.value)}
-                    >
-                      <option value="">Selecciona servicio</option>
-                      {services.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                    <input
-                      className="rounded border p-2 text-sm"
-                      type="number"
-                      placeholder="Precio"
-                      value={itemPrice}
-                      onChange={(e) => setItemPrice(e.target.value)}
-                    />
+                    <div>
+                      <select
+                        className={`w-full rounded border p-2 text-sm ${itemErrors.serviceId ? "border-red-400 bg-red-50" : ""}`}
+                        value={itemServiceId}
+                        onChange={(e) => handleServiceChange(e.target.value)}
+                      >
+                        <option value="">Selecciona servicio *</option>
+                        {services.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      {itemErrors.serviceId && (
+                        <p className="mt-1 text-xs text-red-500">{itemErrors.serviceId}</p>
+                      )}
+                    </div>
+                    <div>
+                      <input
+                        className={`w-full rounded border p-2 text-sm ${itemErrors.price ? "border-red-400 bg-red-50" : ""}`}
+                        type="number"
+                        placeholder="Precio *"
+                        value={itemPrice}
+                        min="0"
+                        onChange={(e) => {
+                          setItemPrice(e.target.value)
+                          if (itemErrors.price) setItemErrors((prev) => ({ ...prev, price: undefined }))
+                        }}
+                      />
+                      {itemErrors.price && (
+                        <p className="mt-1 text-xs text-red-500">{itemErrors.price}</p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => addItem(plan.id)}
-                      disabled={!itemServiceId || !itemPrice}
+                      disabled={savingItem}
                       className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
                     >
-                      Agregar
+                      {savingItem ? "Agregando..." : "Agregar"}
                     </button>
                     <button
-                      onClick={() => setOpenItemForm(null)}
+                      onClick={() => { setOpenItemForm(null); setItemErrors({}) }}
                       className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
                     >
                       Cancelar
@@ -691,7 +722,7 @@ export default function TreatmentsPage() {
                 </div>
               ) : (
                 <button
-                  onClick={() => setOpenItemForm(plan.id)}
+                  onClick={() => { setOpenItemForm(plan.id); setItemErrors({}) }}
                   className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
                 >
                   + Agregar procedimiento
@@ -701,17 +732,13 @@ export default function TreatmentsPage() {
               {/* HISTORIAL DE PAGOS */}
               <div className="space-y-2 pt-2 border-t">
                 <p className="text-sm font-semibold text-gray-700 pt-2">Historial de Pagos</p>
-
                 {plan.treatment_payments.length === 0 ? (
                   <p className="text-gray-400 text-sm">No hay pagos registrados aún.</p>
                 ) : (
                   plan.treatment_payments
                     .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
                     .map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex items-center justify-between rounded-xl border p-3"
-                      >
+                      <div key={payment.id} className="flex items-center justify-between rounded-xl border p-3">
                         <div>
                           <p className="text-sm font-medium">
                             {formatDate(payment.payment_date)} · {PAYMENT_METHOD_LABELS[payment.payment_method]}
@@ -722,7 +749,6 @@ export default function TreatmentsPage() {
                           </p>
                           <p className="text-xs text-gray-400">{payment.receipt_number}</p>
                         </div>
-
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => generateReceiptPDF(plan, payment)}
@@ -746,13 +772,19 @@ export default function TreatmentsPage() {
               {openPaymentForm === plan.id ? (
                 <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <input
-                      className="rounded border p-2 text-sm"
-                      type="number"
-                      placeholder="Monto"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                    />
+                    <div>
+                      <input
+                        className={`w-full rounded border p-2 text-sm ${paymentError && !paymentAmount ? "border-red-400 bg-red-50" : ""}`}
+                        type="number"
+                        placeholder="Monto *"
+                        min="0"
+                        value={paymentAmount}
+                        onChange={(e) => {
+                          setPaymentAmount(e.target.value)
+                          if (paymentError) setPaymentError("")
+                        }}
+                      />
+                    </div>
                     <select
                       className="rounded border p-2 text-sm"
                       value={paymentMethod}
@@ -769,6 +801,11 @@ export default function TreatmentsPage() {
                     value={paymentNotes}
                     onChange={(e) => setPaymentNotes(e.target.value)}
                   />
+
+                  {/* 👇 Muestra el saldo disponible */}
+                  <p className="text-xs text-gray-500">
+                    Saldo pendiente: <strong>${balance}</strong>
+                  </p>
 
                   {paymentError && (
                     <p className="text-sm text-red-500">{paymentError}</p>

@@ -11,16 +11,33 @@ type AppointmentType = {
   duration_minutes: number
 }
 
+type FormErrors = {
+  name?: string
+  price?: string
+  duration?: string
+}
+
+type EditErrors = {
+  editName?: string
+  editPrice?: string
+  editDuration?: string
+}
+
 export default function ServicesPage() {
   const [services, setServices] = useState<AppointmentType[]>([])
   const [clinicId, setClinicId] = useState("")
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [duration, setDuration] = useState("")
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [saving, setSaving] = useState(false)
+
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
   const [editPrice, setEditPrice] = useState("")
   const [editDuration, setEditDuration] = useState("")
+  const [editErrors, setEditErrors] = useState<EditErrors>({})
+  const [editSaving, setEditSaving] = useState(false)
 
   useEffect(() => {
     loadServices()
@@ -48,22 +65,80 @@ export default function ServicesPage() {
     if (data) setServices(data)
   }
 
+  // 👇 NUEVO — validación crear
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {}
+
+    if (!name.trim()) {
+      newErrors.name = "El nombre es obligatorio."
+    } else if (name.trim().length < 3) {
+      newErrors.name = "El nombre debe tener al menos 3 caracteres."
+    }
+
+    if (!price) {
+      newErrors.price = "El precio es obligatorio."
+    } else if (parseFloat(price) <= 0) {
+      newErrors.price = "El precio debe ser mayor a cero."
+    }
+
+    if (!duration) {
+      newErrors.duration = "La duración es obligatoria."
+    } else if (parseInt(duration) <= 0) {
+      newErrors.duration = "La duración debe ser mayor a cero."
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  // 👇 NUEVO — validación editar
+  const validateEdit = (): boolean => {
+    const newErrors: EditErrors = {}
+
+    if (!editName.trim()) {
+      newErrors.editName = "El nombre es obligatorio."
+    } else if (editName.trim().length < 3) {
+      newErrors.editName = "El nombre debe tener al menos 3 caracteres."
+    }
+
+    if (!editPrice) {
+      newErrors.editPrice = "El precio es obligatorio."
+    } else if (parseFloat(editPrice) <= 0) {
+      newErrors.editPrice = "El precio debe ser mayor a cero."
+    }
+
+    if (!editDuration) {
+      newErrors.editDuration = "La duración es obligatoria."
+    } else if (parseInt(editDuration) <= 0) {
+      newErrors.editDuration = "La duración debe ser mayor a cero."
+    }
+
+    setEditErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const createService = async () => {
-    if (!name || !price || !duration) return
+    if (!validate()) return
+    setSaving(true)
 
     const { data, error } = await supabase
       .from("appointment_types")
       .insert({
         clinic_id: clinicId,
-        name,
+        name: name.trim(),
         price: parseFloat(price),
         duration_minutes: parseInt(duration),
       })
       .select()
       .single()
 
-    if (!error && data) {
-      // 👇 NUEVO
+    if (error) {
+      setErrors({ name: "Error al crear el servicio. Intenta de nuevo." })
+      setSaving(false)
+      return
+    }
+
+    if (data) {
       await logActivity({
         clinicId,
         action: "creó servicio",
@@ -76,20 +151,30 @@ export default function ServicesPage() {
     setName("")
     setPrice("")
     setDuration("")
+    setErrors({})
+    setSaving(false)
     loadServices()
   }
 
   const saveEdit = async (id: string) => {
-    await supabase
+    if (!validateEdit()) return
+    setEditSaving(true)
+
+    const { error } = await supabase
       .from("appointment_types")
       .update({
-        name: editName,
+        name: editName.trim(),
         price: parseFloat(editPrice),
         duration_minutes: parseInt(editDuration),
       })
       .eq("id", id)
 
-    // 👇 NUEVO
+    if (error) {
+      setEditErrors({ editName: "Error al guardar. Intenta de nuevo." })
+      setEditSaving(false)
+      return
+    }
+
     await logActivity({
       clinicId,
       action: "editó servicio",
@@ -99,6 +184,8 @@ export default function ServicesPage() {
     })
 
     setEditingId(null)
+    setEditErrors({})
+    setEditSaving(false)
     loadServices()
   }
 
@@ -107,10 +194,8 @@ export default function ServicesPage() {
     if (!confirm) return
 
     const service = services.find((s) => s.id === id)
-
     await supabase.from("appointment_types").delete().eq("id", id)
 
-    // 👇 NUEVO
     await logActivity({
       clinicId,
       action: "eliminó servicio",
@@ -127,6 +212,7 @@ export default function ServicesPage() {
     setEditName(service.name)
     setEditPrice(String(service.price))
     setEditDuration(String(service.duration_minutes))
+    setEditErrors({})
   }
 
   return (
@@ -140,35 +226,60 @@ export default function ServicesPage() {
       <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-2xl font-bold">Nuevo servicio</h2>
 
-        <input
-          className="w-full rounded border p-2"
-          placeholder="Nombre del servicio (ej. Consulta General)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        {/* NOMBRE */}
+        <div>
+          <input
+            className={`w-full rounded border p-2 ${errors.name ? "border-red-400 bg-red-50" : ""}`}
+            placeholder="Nombre del servicio (ej. Consulta General) *"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
+            }}
+          />
+          {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <input
-            className="w-full rounded border p-2"
-            placeholder="Precio ($)"
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
-          <input
-            className="w-full rounded border p-2"
-            placeholder="Duración (minutos)"
-            type="number"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-          />
+          {/* PRECIO */}
+          <div>
+            <input
+              className={`w-full rounded border p-2 ${errors.price ? "border-red-400 bg-red-50" : ""}`}
+              placeholder="Precio ($) *"
+              type="number"
+              min="0"
+              value={price}
+              onChange={(e) => {
+                setPrice(e.target.value)
+                if (errors.price) setErrors((prev) => ({ ...prev, price: undefined }))
+              }}
+            />
+            {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
+          </div>
+
+          {/* DURACIÓN */}
+          <div>
+            <input
+              className={`w-full rounded border p-2 ${errors.duration ? "border-red-400 bg-red-50" : ""}`}
+              placeholder="Duración (minutos) *"
+              type="number"
+              min="1"
+              value={duration}
+              onChange={(e) => {
+                setDuration(e.target.value)
+                if (errors.duration) setErrors((prev) => ({ ...prev, duration: undefined }))
+              }}
+            />
+            {errors.duration && <p className="mt-1 text-xs text-red-500">{errors.duration}</p>}
+          </div>
         </div>
 
         <button
           onClick={createService}
-          className="rounded bg-black px-4 py-2 text-white"
+          disabled={saving}
+          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
         >
-          Crear servicio
+          {saving ? "Creando..." : "Crear servicio"}
         </button>
       </div>
 
@@ -178,42 +289,67 @@ export default function ServicesPage() {
           <p className="text-gray-400 text-sm">No hay servicios creados aún.</p>
         ) : (
           services.map((service) => (
-            <div
-              key={service.id}
-              className="rounded-2xl border bg-white p-4 shadow-sm"
-            >
+            <div key={service.id} className="rounded-2xl border bg-white p-4 shadow-sm">
               {editingId === service.id ? (
                 <div className="space-y-3">
-                  <input
-                    className="w-full rounded border p-2 font-bold"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
+
+                  {/* EDITAR NOMBRE */}
+                  <div>
                     <input
-                      className="w-full rounded border p-2"
-                      type="number"
-                      value={editPrice}
-                      onChange={(e) => setEditPrice(e.target.value)}
-                      placeholder="Precio ($)"
+                      className={`w-full rounded border p-2 font-bold ${editErrors.editName ? "border-red-400 bg-red-50" : ""}`}
+                      value={editName}
+                      onChange={(e) => {
+                        setEditName(e.target.value)
+                        if (editErrors.editName) setEditErrors((prev) => ({ ...prev, editName: undefined }))
+                      }}
                     />
-                    <input
-                      className="w-full rounded border p-2"
-                      type="number"
-                      value={editDuration}
-                      onChange={(e) => setEditDuration(e.target.value)}
-                      placeholder="Duración (min)"
-                    />
+                    {editErrors.editName && <p className="mt-1 text-xs text-red-500">{editErrors.editName}</p>}
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* EDITAR PRECIO */}
+                    <div>
+                      <input
+                        className={`w-full rounded border p-2 ${editErrors.editPrice ? "border-red-400 bg-red-50" : ""}`}
+                        type="number"
+                        min="0"
+                        value={editPrice}
+                        onChange={(e) => {
+                          setEditPrice(e.target.value)
+                          if (editErrors.editPrice) setEditErrors((prev) => ({ ...prev, editPrice: undefined }))
+                        }}
+                        placeholder="Precio ($)"
+                      />
+                      {editErrors.editPrice && <p className="mt-1 text-xs text-red-500">{editErrors.editPrice}</p>}
+                    </div>
+
+                    {/* EDITAR DURACIÓN */}
+                    <div>
+                      <input
+                        className={`w-full rounded border p-2 ${editErrors.editDuration ? "border-red-400 bg-red-50" : ""}`}
+                        type="number"
+                        min="1"
+                        value={editDuration}
+                        onChange={(e) => {
+                          setEditDuration(e.target.value)
+                          if (editErrors.editDuration) setEditErrors((prev) => ({ ...prev, editDuration: undefined }))
+                        }}
+                        placeholder="Duración (min)"
+                      />
+                      {editErrors.editDuration && <p className="mt-1 text-xs text-red-500">{editErrors.editDuration}</p>}
+                    </div>
+                  </div>
+
                   <div className="flex gap-2">
                     <button
                       onClick={() => saveEdit(service.id)}
-                      className="rounded bg-black px-4 py-2 text-white text-sm"
+                      disabled={editSaving}
+                      className="rounded bg-black px-4 py-2 text-white text-sm disabled:opacity-50"
                     >
-                      Guardar
+                      {editSaving ? "Guardando..." : "Guardar"}
                     </button>
                     <button
-                      onClick={() => setEditingId(null)}
+                      onClick={() => { setEditingId(null); setEditErrors({}) }}
                       className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
                     >
                       Cancelar

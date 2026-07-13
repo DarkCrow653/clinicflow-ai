@@ -26,6 +26,12 @@ type Appointment = {
   appointment_types: { name: string; price: number } | null
 }
 
+type FormErrors = {
+  patientId?: string
+  serviceId?: string
+  date?: string
+}
+
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
   confirmed: "Confirmada",
@@ -50,10 +56,11 @@ export default function AppointmentsPage() {
   const [date, setDate] = useState("")
   const [clinicId, setClinicId] = useState("")
   const [activeFilter, setActiveFilter] = useState("todas")
-
   const [selectedServiceId, setSelectedServiceId] = useState("")
   const [selectedPrice, setSelectedPrice] = useState(0)
   const [selectedDuration, setSelectedDuration] = useState(0)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [saving, setSaving] = useState(false)
 
   const filteredAppointments = appointments.filter((a) =>
     activeFilter === "todas" ? true : a.status === activeFilter
@@ -123,6 +130,7 @@ export default function AppointmentsPage() {
 
   const handleServiceChange = (serviceId: string) => {
     setSelectedServiceId(serviceId)
+    if (errors.serviceId) setErrors((prev) => ({ ...prev, serviceId: undefined }))
     const service = services.find((s) => s.id === serviceId)
     if (service) {
       setSelectedPrice(service.price)
@@ -133,8 +141,30 @@ export default function AppointmentsPage() {
     }
   }
 
+  // 👇 NUEVO — validación
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {}
+
+    if (!patientId) newErrors.patientId = "Selecciona un paciente."
+    if (!selectedServiceId) newErrors.serviceId = "Selecciona un servicio."
+
+    if (!date) {
+      newErrors.date = "La fecha y hora son obligatorias."
+    } else {
+      const selected = new Date(date)
+      const now = new Date()
+      if (selected <= now) {
+        newErrors.date = "La fecha debe ser futura."
+      }
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const createAppointment = async () => {
-    if (!patientId || !date || !selectedServiceId) return
+    if (!validate()) return
+    setSaving(true)
 
     const { data, error } = await supabase
       .from("appointments")
@@ -149,8 +179,13 @@ export default function AppointmentsPage() {
       .select()
       .single()
 
-    if (!error && data) {
-      // 👇 NUEVO
+    if (error) {
+      setErrors({ date: "Error al crear la cita. Intenta de nuevo." })
+      setSaving(false)
+      return
+    }
+
+    if (data) {
       const patientName = patients.find((p) => p.id === patientId)?.full_name
       await logActivity({
         clinicId,
@@ -166,6 +201,8 @@ export default function AppointmentsPage() {
     setSelectedServiceId("")
     setSelectedPrice(0)
     setSelectedDuration(0)
+    setErrors({})
+    setSaving(false)
     loadAppointments()
   }
 
@@ -177,7 +214,6 @@ export default function AppointmentsPage() {
 
     if (error) { alert(error.message); return }
 
-    // 👇 NUEVO
     const appointment = appointments.find((a) => a.id === appointmentId)
     await logActivity({
       clinicId,
@@ -203,7 +239,6 @@ export default function AppointmentsPage() {
 
     if (error) { alert(error.message); return }
 
-    // 👇 NUEVO
     await logActivity({
       clinicId,
       action: "eliminó cita de",
@@ -225,31 +260,46 @@ export default function AppointmentsPage() {
       <div className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="text-2xl font-bold">Nueva cita</h2>
 
-        <select
-          className="w-full rounded border p-2"
-          value={patientId}
-          onChange={(e) => setPatientId(e.target.value)}
-        >
-          <option value="">Selecciona paciente</option>
-          {patients.map((patient) => (
-            <option key={patient.id} value={patient.id}>
-              {patient.full_name}
-            </option>
-          ))}
-        </select>
+        {/* PACIENTE */}
+        <div>
+          <select
+            className={`w-full rounded border p-2 ${errors.patientId ? "border-red-400 bg-red-50" : ""}`}
+            value={patientId}
+            onChange={(e) => {
+              setPatientId(e.target.value)
+              if (errors.patientId) setErrors((prev) => ({ ...prev, patientId: undefined }))
+            }}
+          >
+            <option value="">Selecciona paciente *</option>
+            {patients.map((patient) => (
+              <option key={patient.id} value={patient.id}>
+                {patient.full_name}
+              </option>
+            ))}
+          </select>
+          {errors.patientId && (
+            <p className="mt-1 text-xs text-red-500">{errors.patientId}</p>
+          )}
+        </div>
 
-        <select
-          className="w-full rounded border p-2"
-          value={selectedServiceId}
-          onChange={(e) => handleServiceChange(e.target.value)}
-        >
-          <option value="">Selecciona servicio</option>
-          {services.map((service) => (
-            <option key={service.id} value={service.id}>
-              {service.name} — ${service.price} · {service.duration_minutes} min
-            </option>
-          ))}
-        </select>
+        {/* SERVICIO */}
+        <div>
+          <select
+            className={`w-full rounded border p-2 ${errors.serviceId ? "border-red-400 bg-red-50" : ""}`}
+            value={selectedServiceId}
+            onChange={(e) => handleServiceChange(e.target.value)}
+          >
+            <option value="">Selecciona servicio *</option>
+            {services.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name} — ${service.price} · {service.duration_minutes} min
+              </option>
+            ))}
+          </select>
+          {errors.serviceId && (
+            <p className="mt-1 text-xs text-red-500">{errors.serviceId}</p>
+          )}
+        </div>
 
         {selectedServiceId && (
           <div className="rounded-xl border bg-gray-50 px-4 py-3 text-sm text-gray-600 flex gap-6">
@@ -258,19 +308,29 @@ export default function AppointmentsPage() {
           </div>
         )}
 
-        <input
-          type="datetime-local"
-          className="w-full rounded border p-2"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
+        {/* FECHA */}
+        <div>
+          <input
+            type="datetime-local"
+            className={`w-full rounded border p-2 ${errors.date ? "border-red-400 bg-red-50" : ""}`}
+            value={date}
+            min={new Date().toISOString().slice(0, 16)}
+            onChange={(e) => {
+              setDate(e.target.value)
+              if (errors.date) setErrors((prev) => ({ ...prev, date: undefined }))
+            }}
+          />
+          {errors.date && (
+            <p className="mt-1 text-xs text-red-500">{errors.date}</p>
+          )}
+        </div>
 
         <button
           onClick={createAppointment}
-          disabled={!patientId || !date || !selectedServiceId}
+          disabled={saving}
           className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
         >
-          Crear cita
+          {saving ? "Creando..." : "Crear cita"}
         </button>
       </div>
 
