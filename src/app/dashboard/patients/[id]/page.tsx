@@ -381,6 +381,12 @@ export default function PatientDetailPage() {
                   >
                     📋 Tratamientos
                   </Link>
+                  <Link
+                    href={`/dashboard/patients/${patient.id}/files`}
+                    className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    📁 Archivos
+                  </Link>
                 </>
               )}
             </div>
