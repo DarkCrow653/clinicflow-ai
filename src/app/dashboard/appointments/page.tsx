@@ -82,6 +82,7 @@ export default function AppointmentsPage() {
   )
 
   const calendarEvents = appointments.map((apt) => ({
+    id: apt.id,
     title: apt.patients?.full_name || "Paciente",
     date: apt.appointment_date,
     status: apt.status,
@@ -245,6 +246,28 @@ export default function AppointmentsPage() {
       entityType: "appointment",
       entityId: appointmentId,
       details: appointment?.patients?.full_name,
+    })
+
+    loadAppointments()
+  }
+
+  const rescheduleAppointment = async (appointmentId: string, newDate: string) => {
+    const { error } = await supabase
+      .from("appointments")
+      .update({ appointment_date: newDate })
+      .eq("id", appointmentId)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    await logActivity({
+      clinicId,
+      action: "reagendó cita de",
+      entityType: "appointment",
+      entityId: appointmentId,
+      details: appointments.find((a) => a.id === appointmentId)?.patients?.full_name,
     })
 
     loadAppointments()
@@ -417,7 +440,10 @@ export default function AppointmentsPage() {
       {/* CALENDARIO */}
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Calendario</h2>
-        <CalendarView events={calendarEvents} />
+        <CalendarView
+          events={calendarEvents}
+          onEventDrop={rescheduleAppointment}
+        />
       </div>
     </div>
   )
