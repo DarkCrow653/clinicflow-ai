@@ -35,6 +35,24 @@ type RecordErrors = {
   chief_complaint?: string
 }
 
+// 👇 NUEVO — tipos para el resumen
+type TreatmentSummary = {
+  id: string
+  title: string
+  status: string
+  total_amount: number
+  total_paid: number
+}
+
+type NextAppointment = {
+  appointment_date: string
+  appointment_types: { name: string } | null
+}
+
+type FileCount = {
+  count: number
+}
+
 const emptyForm = {
   consultation_date: new Date().toISOString().split("T")[0],
   chief_complaint: "",
@@ -42,6 +60,20 @@ const emptyForm = {
   treatment: "",
   observations: "",
   next_followup: "",
+}
+
+const PLAN_STATUS_LABELS: Record<string, string> = {
+  draft: "Borrador",
+  active: "Activo",
+  completed: "Completado",
+  cancelled: "Cancelado",
+}
+
+const PLAN_STATUS_STYLES: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-600",
+  active: "bg-blue-50 text-blue-700",
+  completed: "bg-green-50 text-green-700",
+  cancelled: "bg-red-50 text-red-700",
 }
 
 export default function PatientDetailPage() {
@@ -52,6 +84,12 @@ export default function PatientDetailPage() {
   const [clinicId, setClinicId] = useState("")
   const [userId, setUserId] = useState("")
   const [role, setRole] = useState("")
+
+  // 👇 NUEVO — resumen del paciente
+  const [activeTreatments, setActiveTreatments] = useState<TreatmentSummary[]>([])
+  const [nextAppointment, setNextAppointment] = useState<NextAppointment | null>(null)
+  const [totalPending, setTotalPending] = useState(0)
+  const [fileCount, setFileCount] = useState(0)
 
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState("")
@@ -70,6 +108,7 @@ export default function PatientDetailPage() {
     if (params?.id) {
       loadPatient()
       loadRecords()
+      loadSummary()
     }
   }, [params])
 
@@ -114,7 +153,56 @@ export default function PatientDetailPage() {
     if (data) setRecords(data)
   }
 
-  // 👇 NUEVO — validación datos del paciente
+  // 👇 NUEVO — carga el resumen ejecutivo en paralelo
+  const loadSummary = async () => {
+    const nowIso = new Date().toISOString()
+
+    const [plansRes, nextAptRes, filesRes] = await Promise.all([
+      supabase
+        .from("treatment_plans")
+        .select("id, title, status, total_amount, treatment_payments(amount)")
+        .eq("patient_id", params.id)
+        .in("status", ["draft", "active"]),
+      supabase
+        .from("appointments")
+        .select("appointment_date, appointment_types(name)")
+        .eq("patient_id", params.id)
+        .gte("appointment_date", nowIso)
+        .neq("status", "cancelled")
+        .order("appointment_date", { ascending: true })
+        .limit(1)
+        .single(),
+      supabase
+        .from("patient_files")
+        .select("id", { count: "exact", head: true })
+        .eq("patient_id", params.id),
+    ])
+
+    if (plansRes.data) {
+      const summaries: TreatmentSummary[] = plansRes.data.map((plan: any) => {
+        const totalPaid = (plan.treatment_payments || []).reduce(
+          (sum: number, p: any) => sum + p.amount, 0
+        )
+        return {
+          id: plan.id,
+          title: plan.title,
+          status: plan.status,
+          total_amount: plan.total_amount,
+          total_paid: totalPaid,
+        }
+      })
+      setActiveTreatments(summaries)
+
+      const pending = summaries.reduce(
+        (sum, t) => sum + (t.total_amount - t.total_paid), 0
+      )
+      setTotalPending(pending)
+    }
+
+    if (nextAptRes.data) setNextAppointment(nextAptRes.data as any)
+    setFileCount(filesRes.count || 0)
+  }
+
   const validatePatient = (): boolean => {
     const newErrors: PatientErrors = {}
 
@@ -183,7 +271,6 @@ export default function PatientDetailPage() {
     setShowForm(true)
   }
 
-  // 👇 NUEVO — validación consulta clínica
   const validateRecord = (): boolean => {
     const newErrors: RecordErrors = {}
 
@@ -258,6 +345,7 @@ export default function PatientDetailPage() {
     setRecordErrors({})
     setEditingRecordId(null)
     loadRecords()
+    loadSummary()
   }
 
   const deleteRecord = async (recordId: string) => {
@@ -285,6 +373,15 @@ export default function PatientDetailPage() {
       year: "numeric",
     })
 
+  const formatDateTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+
   if (!patient) return <div className="p-10">Cargando...</div>
 
   const canSeeClinicalData = role === "admin" || role === "doctor"
@@ -296,8 +393,6 @@ export default function PatientDetailPage() {
       <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
         {isEditing ? (
           <div className="space-y-3">
-
-            {/* NOMBRE */}
             <div>
               <input
                 className={`w-full rounded border p-2 text-xl font-bold ${patientErrors.editName ? "border-red-400 bg-red-50" : ""}`}
@@ -313,7 +408,6 @@ export default function PatientDetailPage() {
               )}
             </div>
 
-            {/* TELÉFONO */}
             <div>
               <input
                 className={`w-full rounded border p-2 ${patientErrors.editPhone ? "border-red-400 bg-red-50" : ""}`}
@@ -359,7 +453,7 @@ export default function PatientDetailPage() {
             <p className="text-gray-600">{patient.phone}</p>
             <p className="text-gray-600">{patient.email}</p>
 
-            <div className="flex gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-3">
               <button
                 onClick={() => setIsEditing(true)}
                 className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
@@ -369,22 +463,13 @@ export default function PatientDetailPage() {
 
               {canSeeClinicalData && (
                 <>
-                  <Link
-                    href={`/dashboard/patients/${patient.id}/odontogram`}
-                    className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
-                  >
-                    🦷 Ver odontograma
+                  <Link href={`/dashboard/patients/${patient.id}/odontogram`} className="rounded border px-4 py-2 text-sm hover:bg-gray-50">
+                    🦷 Odontograma
                   </Link>
-                  <Link
-                    href={`/dashboard/patients/${patient.id}/treatments`}
-                    className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
-                  >
+                  <Link href={`/dashboard/patients/${patient.id}/treatments`} className="rounded border px-4 py-2 text-sm hover:bg-gray-50">
                     📋 Tratamientos
                   </Link>
-                  <Link
-                    href={`/dashboard/patients/${patient.id}/files`}
-                    className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
-                  >
+                  <Link href={`/dashboard/patients/${patient.id}/files`} className="rounded border px-4 py-2 text-sm hover:bg-gray-50">
                     📁 Archivos
                   </Link>
                 </>
@@ -393,6 +478,99 @@ export default function PatientDetailPage() {
           </div>
         )}
       </div>
+
+      {/* 👇 NUEVO — RESUMEN EJECUTIVO */}
+      {canSeeClinicalData && (
+        <div className="grid gap-4 md:grid-cols-4">
+          {/* Próxima cita */}
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-xs text-gray-500">Próxima cita</p>
+            {nextAppointment ? (
+              <>
+                <p className="text-sm font-bold mt-1">
+                  {new Date(nextAppointment.appointment_date).toLocaleDateString("es-ES", {
+                    day: "2-digit", month: "short", year: "numeric",
+                  })}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {new Date(nextAppointment.appointment_date).toLocaleTimeString("es-ES", {
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                  {nextAppointment.appointment_types && ` · ${(nextAppointment.appointment_types as any).name}`}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-400 mt-1">Sin cita agendada</p>
+            )}
+          </div>
+
+          {/* Tratamientos activos */}
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-xs text-gray-500">Tratamientos activos</p>
+            <p className="text-3xl font-bold mt-1">{activeTreatments.length}</p>
+          </div>
+
+          {/* Saldo pendiente */}
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-xs text-gray-500">Saldo pendiente</p>
+            <p className={`text-3xl font-bold mt-1 ${totalPending > 0 ? "text-red-600" : "text-green-600"}`}>
+              ${totalPending}
+            </p>
+          </div>
+
+          {/* Archivos */}
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <p className="text-xs text-gray-500">Archivos clínicos</p>
+            <p className="text-3xl font-bold mt-1">{fileCount}</p>
+            <Link href={`/dashboard/patients/${patient.id}/files`} className="text-xs text-gray-400 hover:text-black">
+              Ver archivos →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* 👇 NUEVO — TRATAMIENTOS ACTIVOS */}
+      {canSeeClinicalData && activeTreatments.length > 0 && (
+        <div className="rounded-2xl bg-white p-6 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">Tratamientos Activos</h2>
+            <Link href={`/dashboard/patients/${patient.id}/treatments`} className="text-xs text-gray-400 hover:text-black">
+              Ver todos →
+            </Link>
+          </div>
+
+          {activeTreatments.map((t) => {
+            const balance = t.total_amount - t.total_paid
+            const progress = t.total_amount > 0
+              ? Math.round((t.total_paid / t.total_amount) * 100)
+              : 0
+
+            return (
+              <div key={t.id} className="rounded-xl border p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-sm">{t.title}</p>
+                  <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${PLAN_STATUS_STYLES[t.status]}`}>
+                    {PLAN_STATUS_LABELS[t.status]}
+                  </span>
+                </div>
+
+                <div className="flex gap-4 text-xs text-gray-500">
+                  <span>Total: <strong>${t.total_amount}</strong></span>
+                  <span>Pagado: <strong className="text-green-600">${t.total_paid}</strong></span>
+                  <span>Pendiente: <strong className={balance > 0 ? "text-red-600" : "text-green-600"}>${balance}</strong></span>
+                </div>
+
+                <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-black transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* HISTORIAL CLÍNICO */}
       {canSeeClinicalData && (
@@ -414,7 +592,6 @@ export default function PatientDetailPage() {
               </h3>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {/* FECHA CONSULTA */}
                 <div>
                   <label className="text-xs text-gray-500">Fecha de consulta *</label>
                   <input
@@ -442,7 +619,6 @@ export default function PatientDetailPage() {
                 </div>
               </div>
 
-              {/* MOTIVO */}
               <div>
                 <label className="text-xs text-gray-500">Motivo de consulta *</label>
                 <textarea
@@ -515,16 +691,10 @@ export default function PatientDetailPage() {
                       Consulta {formatDate(record.consultation_date)}
                     </span>
                     <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => openEditForm(record)}
-                        className="text-xs text-gray-500 hover:text-black"
-                      >
+                      <button onClick={() => openEditForm(record)} className="text-xs text-gray-500 hover:text-black">
                         Editar
                       </button>
-                      <button
-                        onClick={() => deleteRecord(record.id)}
-                        className="text-xs text-red-400 hover:text-red-600"
-                      >
+                      <button onClick={() => deleteRecord(record.id)} className="text-xs text-red-400 hover:text-red-600">
                         Eliminar
                       </button>
                     </div>
