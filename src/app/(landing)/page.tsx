@@ -85,7 +85,7 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans">
+    <div className="min-h-screen bg-white text-gray-900 font-sans scroll-smooth">
 
       {/* NAVBAR */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-white/90 backdrop-blur-sm">

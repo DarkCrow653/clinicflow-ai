@@ -6,12 +6,15 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
-      <aside className="h-screen shrink-0 overflow-hidden">
+    <div
+      className="flex bg-gray-100"
+      style={{ height: "100dvh", overflow: "hidden" }}
+    >
+      <aside style={{ height: "100dvh", overflow: "hidden", flexShrink: 0 }}>
         <Sidebar />
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
+      <main style={{ flex: 1, overflowY: "auto" }}>
         {children}
       </main>
     </div>

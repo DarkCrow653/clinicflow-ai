@@ -125,9 +125,8 @@
     html {
         @apply font-sans;
     }
-    html,
-    body {
-        height: 100%;
-        overflow: hidden;
+    html {
+        @apply font-sans;
+        scroll-behavior: smooth;
     }
 }
