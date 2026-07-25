@@ -135,12 +135,13 @@ export default function LandingPage() {
                 >
                   Comenzar Gratis
                 </Link>
-                
+
+                <Link
                   href="#how-it-works"
                   className="rounded-lg border px-6 py-3 font-medium hover:bg-gray-50 transition"
                 >
                   Ver Demo
-                </a>
+                </Link>
               </div>
               <p className="text-xs text-gray-400">
                 Sin tarjeta de crédito · Configuración en minutos
@@ -408,12 +409,13 @@ export default function LandingPage() {
             >
               Comenzar Gratis
             </Link>
-            
+
+            <Link
               href="#how-it-works"
               className="rounded-lg border px-8 py-4 font-medium text-lg hover:bg-gray-50 transition"
             >
               Saber más
-            </a>
+            </Link>
           </div>
           <p className="text-xs text-gray-400">Sin tarjeta de crédito · Configuración en minutos</p>
         </div>
