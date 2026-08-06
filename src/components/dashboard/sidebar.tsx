@@ -14,6 +14,7 @@ import {
   ScrollText,
   FileSpreadsheet,
   Settings,
+  Zap,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
@@ -92,6 +93,12 @@ export default function Sidebar() {
       href: "/dashboard/settings",
       label: "Configuración",
       icon: Settings,
+      roles: ["admin"],
+    },
+    {
+      href: "/dashboard/upgrade",
+      label: "⚡ Actualizar Plan",
+      icon: Zap,
       roles: ["admin"],
     },
   ]

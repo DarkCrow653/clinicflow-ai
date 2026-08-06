@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
+import { usePlan } from "@/lib/usePlan"
 
 type Patient = {
   id: string
@@ -24,6 +25,7 @@ export default function PatientsPage() {
   const [search, setSearch] = useState("")
   const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
+  const { canAddPatient, isFree } = usePlan()
 
   const filteredPatients = patients.filter((p) =>
     p.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -76,6 +78,16 @@ export default function PatientsPage() {
 
   const createPatient = async () => {
     if (!validate()) return
+
+    if (!canAddPatient(patients.length)) {
+      setErrors({
+        fullName: isFree
+          ? "Has alcanzado el límite de 100 pacientes del plan Free. Actualiza a Pro para continuar."
+          : "Has alcanzado el límite de pacientes de tu plan. Actualiza para continuar.",
+      })
+      return
+    }
+
     setSaving(true)
 
     const { data, error } = await supabase

@@ -1,4 +1,5 @@
 import Sidebar from "@/components/dashboard/sidebar"
+import PlanBanner from "@/components/dashboard/plan-banner"
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,7 @@ export default function DashboardLayout({
       </aside>
 
       <main style={{ flex: 1, overflowY: "auto" }}>
+        <PlanBanner />
         {children}
       </main>
     </div>
