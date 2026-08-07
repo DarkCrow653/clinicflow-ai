@@ -423,18 +423,44 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer className="border-t py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div>
-            <span className="font-bold">ClinicFlow</span>
-            <span className="text-xs text-gray-400 ml-2">AI Dental</span>
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="grid gap-8 md:grid-cols-4">
+            <div className="space-y-2">
+              <p className="font-bold">ClinicFlow</p>
+              <p className="text-xs text-gray-400">Software de gestión para clínicas dentales.</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Producto</p>
+              <div className="space-y-1">
+                <a href="#features" className="block text-xs text-gray-400 hover:text-black">Funcionalidades</a>
+                <a href="#pricing" className="block text-xs text-gray-400 hover:text-black">Planes</a>
+                <a href="#faq" className="block text-xs text-gray-400 hover:text-black">FAQ</a>
+                <a href="/roadmap" className="block text-xs text-gray-400 hover:text-black">Roadmap</a>
+                <a href="/changelog" className="block text-xs text-gray-400 hover:text-black">Changelog</a>
+                <a href="/status" className="block text-xs text-gray-400 hover:text-black">Estado del servicio</a>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Legal</p>
+              <div className="space-y-1">
+                <a href="/privacy" className="block text-xs text-gray-400 hover:text-black">Privacidad</a>
+                <a href="/terms" className="block text-xs text-gray-400 hover:text-black">Términos</a>
+                <a href="/cookies" className="block text-xs text-gray-400 hover:text-black">Cookies</a>
+                <a href="/dpa" className="block text-xs text-gray-400 hover:text-black">DPA</a>
+                <a href="/medical-disclaimer" className="block text-xs text-gray-400 hover:text-black">Aviso Médico</a>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Soporte</p>
+              <div className="space-y-1">
+                <a href="/contact" className="block text-xs text-gray-400 hover:text-black">Contacto</a>
+                <a href="mailto:soporte@clinicflow.ai" className="block text-xs text-gray-400 hover:text-black">soporte@clinicflow.ai</a>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-gray-400">
-            © {new Date().getFullYear()} ClinicFlow. Todos los derechos reservados.
-          </p>
-          <div className="flex gap-4 text-xs text-gray-400">
-            <a href="#" className="hover:text-black">Privacidad</a>
-            <a href="#" className="hover:text-black">Términos</a>
-            <a href="#" className="hover:text-black">Contacto</a>
+          <div className="border-t pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-gray-400">© {new Date().getFullYear()} ClinicFlow AI. Todos los derechos reservados.</p>
+            <p className="text-xs text-gray-400">Hecho para odontólogos 🦷</p>
           </div>
         </div>
       </footer>
