@@ -1,44 +1,33 @@
 import Link from "next/link"
 
-const links = [
-  { href: "/privacy", label: "Privacidad" },
-  { href: "/terms", label: "Términos" },
-  { href: "/cookies", label: "Cookies" },
-  { href: "/dpa", label: "DPA" },
-  { href: "/medical-disclaimer", label: "Descargo médico" },
-  { href: "/contact", label: "Contacto" },
-  { href: "/status", label: "Estado" },
-  { href: "/roadmap", label: "Roadmap" },
-  { href: "/changelog", label: "Changelog" },
-]
-
-export default function LegalLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto flex max-w-5xl flex-col px-6 py-12">
-        <nav className="mb-8 flex flex-wrap gap-2 rounded-full border border-slate-200 bg-white p-2 shadow-sm">
-          <Link href="/" className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
-            Inicio
-          </Link>
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+    <div className="min-h-screen bg-white">
+      {/* NAVBAR */}
+      <nav className="border-b px-6 py-4 flex items-center justify-between">
+        <Link href="/" className="font-bold text-lg">ClinicFlow</Link>
+        <Link href="/" className="text-sm text-gray-500 hover:text-black">← Volver al inicio</Link>
+      </nav>
 
-        <main className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          {children}
-        </main>
+      {/* CONTENIDO */}
+      <div className="max-w-3xl mx-auto px-6 py-16">
+        {children}
       </div>
+
+      {/* FOOTER LEGAL */}
+      <footer className="border-t py-8 px-6">
+        <div className="max-w-6xl mx-auto flex flex-wrap gap-4 justify-center text-xs text-gray-400">
+          <Link href="/privacy" className="hover:text-black">Privacidad</Link>
+          <Link href="/terms" className="hover:text-black">Términos</Link>
+          <Link href="/cookies" className="hover:text-black">Cookies</Link>
+          <Link href="/dpa" className="hover:text-black">DPA</Link>
+          <Link href="/medical-disclaimer" className="hover:text-black">Aviso Médico</Link>
+          <Link href="/contact" className="hover:text-black">Contacto</Link>
+          <Link href="/status" className="hover:text-black">Estado</Link>
+          <Link href="/roadmap" className="hover:text-black">Roadmap</Link>
+          <Link href="/changelog" className="hover:text-black">Changelog</Link>
+        </div>
+      </footer>
     </div>
   )
 }
