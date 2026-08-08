@@ -74,7 +74,7 @@ export default function ReportsPage() {
       .eq("clinic_id", clinicId)
       .order("appointment_date", { ascending: true })
 
-    const rows = ((data || []) as { appointment_date: string; status: string; patients?: { full_name: string } | null; appointment_types?: { name: string } | null }[]).map((a) => ({
+    const rows = ((data || []) as any[]).map((a) => ({
       paciente: a.patients?.full_name || "Sin nombre",
       fecha: new Date(a.appointment_date).toLocaleString("es-ES"),
       estado: STATUS_LABELS[a.status] || a.status,
