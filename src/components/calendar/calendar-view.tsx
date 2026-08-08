@@ -11,7 +11,7 @@ type Event = {
   title: string
   date: string
   status?: string
-  duration?: number // minutos
+  duration?: number
   serviceName?: string
 }
 
@@ -35,7 +35,7 @@ type Props = {
 }
 
 export default function CalendarView({ events, onEventDrop }: Props) {
-  const calendarRef = useRef<unknown>(null)
+  const calendarRef = useRef<FullCalendar>(null) // ✅ tipo correcto
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
 
   const calendarEvents = events.map((event) => {
@@ -46,7 +46,6 @@ export default function CalendarView({ events, onEventDrop }: Props) {
       id: event.id || "",
       title: event.title,
       start: event.date,
-      // 👇 NUEVO — duración real de la cita
       end: new Date(new Date(event.date).getTime() + durationMinutes * 60000).toISOString(),
       backgroundColor: colors.bg,
       borderColor: colors.border,
@@ -77,7 +76,7 @@ export default function CalendarView({ events, onEventDrop }: Props) {
         ))}
       </div>
 
-      {/* MODAL DE DETALLE AL HACER CLICK 👇 */}
+      {/* MODAL DE DETALLE */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="rounded-2xl bg-white p-6 shadow-xl w-full max-w-sm space-y-3">
@@ -168,14 +167,10 @@ export default function CalendarView({ events, onEventDrop }: Props) {
         events={calendarEvents}
         height="80vh"
         eventDisplay="block"
-
-        // 👇 NUEVO — click para ver detalle
         eventClick={(info) => {
           const event = events.find((e) => e.id === info.event.id)
           if (event) setSelectedEvent(event)
         }}
-
-        // 👇 NUEVO — drag & drop para reagendar
         editable={!!onEventDrop}
         droppable={!!onEventDrop}
         eventDrop={(info) => {
@@ -183,14 +178,11 @@ export default function CalendarView({ events, onEventDrop }: Props) {
             onEventDrop(info.event.id, info.event.start?.toISOString() || "")
           }
         }}
-
-        // 👇 Estilos del slot de tiempo
         slotLabelFormat={{
           hour: "2-digit",
           minute: "2-digit",
           hour12: false,
         }}
-
         eventTimeFormat={{
           hour: "2-digit",
           minute: "2-digit",
