@@ -131,8 +131,8 @@ export default function DashboardPage() {
     if (clinicRes.data) setClinicName(clinicRes.data.name)
     setTotalPatients(patientCountRes.count || 0)
     setTotalAppointments(appointmentCountRes.count || 0)
-    setTodayAppointments((todayRes.data as Appointment[]) ?? [])
-    setTomorrowAppointments((tomorrowRes.data as Appointment[]) ?? [])
+    setTodayAppointments((todayRes.data as any[]) ?? [])
+    setTomorrowAppointments((tomorrowRes.data as any[]) ?? [])
 
     if (profile.role === "admin") {
       // 👇 PARALELO 2 — todas las consultas de admin al mismo tiempo
