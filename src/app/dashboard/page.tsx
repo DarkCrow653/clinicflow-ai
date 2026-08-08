@@ -242,7 +242,7 @@ export default function DashboardPage() {
 
       // Top tratamientos dentales
       if (completedItemsRes.data) {
-        const completedItems = completedItemsRes.data as CompletedItem[]
+        const completedItems = completedItemsRes.data as any[]
         const treatmentMap: Record<string, { count: number; revenue: number }> = {}
         completedItems.forEach((item) => {
           const name = item.appointment_types?.name
@@ -259,7 +259,7 @@ export default function DashboardPage() {
       }
 
       // Próximas citas
-      if (upcomingRes.data) setUpcomingAppointments(upcomingRes.data as UpcomingAppointment[])
+      if (upcomingRes.data) setUpcomingAppointments(upcomingRes.data as any[])
 
       // Actividad reciente
       if (activityRes.data) setRecentActivity(activityRes.data)
