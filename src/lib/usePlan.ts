@@ -28,11 +28,7 @@ export function usePlan(): UsePlanReturn {
   const [plan, setPlan] = useState<Plan | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadPlan()
-  }, [])
-
-  const loadPlan = async () => {
+  async function loadPlan() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -61,6 +57,14 @@ export function usePlan(): UsePlanReturn {
     if (planData) setPlan(planData)
     setLoading(false)
   }
+
+  useEffect(() => {
+    const fetchPlan = async () => {
+      await loadPlan()
+    }
+
+    void fetchPlan()
+  }, [])
 
   const isFree = plan?.id === "free"
   const isPro = plan?.id === "pro"

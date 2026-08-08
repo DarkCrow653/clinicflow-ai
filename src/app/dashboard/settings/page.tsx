@@ -13,11 +13,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    loadClinic()
-  }, [])
-
-  const loadClinic = async () => {
+  async function loadClinic() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -44,6 +40,14 @@ export default function SettingsPage() {
       setLogoUrl(clinic.logo_url || "")
     }
   }
+
+  useEffect(() => {
+    const fetchClinic = async () => {
+      await loadClinic()
+    }
+
+    void fetchClinic()
+  }, [])
 
   const save = async () => {
     setSaving(true)

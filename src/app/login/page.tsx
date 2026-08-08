@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
+import BackButton from "@/components/ui/back-button"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -27,6 +28,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-4">
+        <BackButton href="/" label="Volver al inicio" />
         <h1 className="text-3xl font-bold">
           Login
         </h1>

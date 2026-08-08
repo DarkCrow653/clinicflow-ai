@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
+import { softDelete } from "@/lib/softDelete"
 import Link from "next/link"
 
 type Patient = {
@@ -49,8 +50,17 @@ type NextAppointment = {
   appointment_types: { name: string } | null
 }
 
-type FileCount = {
-  count: number
+type TreatmentPlanWithPayments = {
+  id: string
+  title: string
+  status: string
+  total_amount: number
+  treatment_payments?: { amount: number }[] | null
+}
+
+type AppointmentWithType = {
+  appointment_date: string
+  appointment_types: { name: string } | null
 }
 
 const emptyForm = {
@@ -104,15 +114,9 @@ export default function PatientDetailPage() {
   const [recordErrors, setRecordErrors] = useState<RecordErrors>({})
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (params?.id) {
-      loadPatient()
-      loadRecords()
-      loadSummary()
-    }
-  }, [params])
+  const loadPatient = useCallback(async () => {
+    if (!params?.id) return
 
-  const loadPatient = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) setUserId(user.id)
 
@@ -141,9 +145,11 @@ export default function PatientDetailPage() {
       setEditPhone(data.phone || "")
       setEditEmail(data.email || "")
     }
-  }
+  }, [params])
 
-  const loadRecords = async () => {
+  const loadRecords = useCallback(async () => {
+    if (!params?.id) return
+
     const { data } = await supabase
       .from("patient_records_with_author")
       .select("*")
@@ -151,10 +157,11 @@ export default function PatientDetailPage() {
       .order("consultation_date", { ascending: false })
 
     if (data) setRecords(data)
-  }
+  }, [params])
 
   // 👇 NUEVO — carga el resumen ejecutivo en paralelo
-  const loadSummary = async () => {
+  const loadSummary = useCallback(async () => {
+    if (!params?.id) return
     const nowIso = new Date().toISOString()
 
     const [plansRes, nextAptRes, filesRes] = await Promise.all([
@@ -179,9 +186,11 @@ export default function PatientDetailPage() {
     ])
 
     if (plansRes.data) {
-      const summaries: TreatmentSummary[] = plansRes.data.map((plan: any) => {
+      const plans = plansRes.data as TreatmentPlanWithPayments[]
+      const summaries: TreatmentSummary[] = plans.map((plan) => {
         const totalPaid = (plan.treatment_payments || []).reduce(
-          (sum: number, p: any) => sum + p.amount, 0
+          (sum, p) => sum + (p?.amount ?? 0),
+          0
         )
         return {
           id: plan.id,
@@ -199,9 +208,24 @@ export default function PatientDetailPage() {
       setTotalPending(pending)
     }
 
-    if (nextAptRes.data) setNextAppointment(nextAptRes.data as any)
-    setFileCount(filesRes.count || 0)
-  }
+    if (nextAptRes.data) {
+      const nextApt = nextAptRes.data as AppointmentWithType
+      setNextAppointment(nextApt)
+    }
+    setFileCount(filesRes.count ?? 0)
+  }, [params])
+
+  useEffect(() => {
+    if (!params?.id) return
+
+    const fetchPatientData = async () => {
+      await loadPatient()
+      await loadRecords()
+      await loadSummary()
+    }
+
+    void fetchPatientData()
+  }, [params, loadPatient, loadRecords, loadSummary])
 
   const validatePatient = (): boolean => {
     const newErrors: PatientErrors = {}
@@ -348,22 +372,16 @@ export default function PatientDetailPage() {
     loadSummary()
   }
 
-  const deleteRecord = async (recordId: string) => {
-    const confirm = window.confirm("¿Eliminar esta consulta? Esta acción no se puede deshacer.")
-    if (!confirm) return
-
-    const { error } = await supabase.from("patient_records").delete().eq("id", recordId)
-    if (error) { alert(error.message); return }
-
-    await logActivity({
+  const deleteRecord = async (recordId: string, date: string) => {
+    const deleted = await softDelete({
+      table: "patient_records",
+      id: recordId,
       clinicId,
-      action: "eliminó consulta de",
       entityType: "patient_record",
-      entityId: recordId,
-      details: patient?.full_name,
+      details: `Consulta ${date} de ${patient?.full_name}`,
+      confirmMessage: `¿Eliminar la consulta del ${date}?\n\nEl registro quedará archivado.`,
     })
-
-    loadRecords()
+    if (deleted) loadRecords()
   }
 
   const formatDate = (dateStr: string) =>
@@ -371,15 +389,6 @@ export default function PatientDetailPage() {
       day: "2-digit",
       month: "long",
       year: "numeric",
-    })
-
-  const formatDateTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     })
 
   if (!patient) return <div className="p-10">Cargando...</div>
@@ -496,7 +505,7 @@ export default function PatientDetailPage() {
                   {new Date(nextAppointment.appointment_date).toLocaleTimeString("es-ES", {
                     hour: "2-digit", minute: "2-digit",
                   })}
-                  {nextAppointment.appointment_types && ` · ${(nextAppointment.appointment_types as any).name}`}
+                  {nextAppointment.appointment_types?.name && ` · ${nextAppointment.appointment_types.name}`}
                 </p>
               </>
             ) : (
@@ -694,7 +703,7 @@ export default function PatientDetailPage() {
                       <button onClick={() => openEditForm(record)} className="text-xs text-gray-500 hover:text-black">
                         Editar
                       </button>
-                      <button onClick={() => deleteRecord(record.id)} className="text-xs text-red-400 hover:text-red-600">
+                      <button onClick={() => deleteRecord(record.id, record.consultation_date)} className="text-xs text-red-400 hover:text-red-600">
                         Eliminar
                       </button>
                     </div>

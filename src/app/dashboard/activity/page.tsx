@@ -35,7 +35,7 @@ export default function ActivityPage() {
     loadLogs()
   }, [])
 
-  const loadLogs = async () => {
+  async function loadLogs() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 

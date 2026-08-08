@@ -16,11 +16,7 @@ export default function ReportsPage() {
   const [clinicId, setClinicId] = useState("")
   const [exporting, setExporting] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadClinic()
-  }, [])
-
-  const loadClinic = async () => {
+  async function loadClinic() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -33,6 +29,14 @@ export default function ReportsPage() {
     if (profile) setClinicId(profile.clinic_id)
   }
 
+  useEffect(() => {
+    const fetchClinic = async () => {
+      await loadClinic()
+    }
+
+    void fetchClinic()
+  }, [])
+
   const exportPatients = async () => {
     setExporting("patients")
 
@@ -42,7 +46,7 @@ export default function ReportsPage() {
       .eq("clinic_id", clinicId)
       .order("created_at", { ascending: true })
 
-    const rows = (data || []).map((p) => ({
+    const rows = ((data || []) as { full_name: string; phone?: string | null; email?: string | null; created_at: string }[]).map((p) => ({
       nombre: p.full_name,
       teléfono: p.phone || "",
       email: p.email || "",
@@ -70,7 +74,7 @@ export default function ReportsPage() {
       .eq("clinic_id", clinicId)
       .order("appointment_date", { ascending: true })
 
-    const rows = (data || []).map((a: any) => ({
+    const rows = ((data || []) as { appointment_date: string; status: string; patients?: { full_name: string } | null; appointment_types?: { name: string } | null }[]).map((a) => ({
       paciente: a.patients?.full_name || "Sin nombre",
       fecha: new Date(a.appointment_date).toLocaleString("es-ES"),
       estado: STATUS_LABELS[a.status] || a.status,
@@ -99,7 +103,7 @@ export default function ReportsPage() {
       .eq("status", "completed")
       .order("appointment_date", { ascending: true })
 
-    const rows = (data || []).map((a: any) => ({
+    const rows = ((data || []) as { appointment_date: string; price: number; appointment_types?: { name: string } | null }[]).map((a) => ({
       fecha: new Date(a.appointment_date).toLocaleDateString("es-ES"),
       servicio: a.appointment_types?.name || "Sin servicio",
       importe: a.price || 0,

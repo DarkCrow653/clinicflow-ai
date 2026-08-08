@@ -24,11 +24,7 @@ export default function Sidebar() {
   const router = useRouter()
   const [role, setRole] = useState<string>("")
 
-  useEffect(() => {
-    loadRole()
-  }, [])
-
-  const loadRole = async () => {
+  async function loadRole() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -40,6 +36,14 @@ export default function Sidebar() {
 
     if (profile) setRole(profile.role)
   }
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      await loadRole()
+    }
+
+    void fetchRole()
+  }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

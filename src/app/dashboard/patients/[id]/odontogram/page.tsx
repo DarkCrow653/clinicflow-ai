@@ -56,7 +56,7 @@ export default function OdontogramPage() {
     if (params?.id) loadAll()
   }, [params])
 
-  const loadAll = async () => {
+  async function loadAll() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) setUserId(user.id)
 

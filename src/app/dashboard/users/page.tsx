@@ -50,7 +50,7 @@ export default function UsersPage() {
     loadUsers()
   }, [])
 
-  const loadUsers = async () => {
+  async function loadUsers() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setCurrentUserId(user.id)

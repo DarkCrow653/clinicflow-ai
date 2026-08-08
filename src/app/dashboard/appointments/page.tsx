@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import CalendarView from "@/components/calendar/calendar-view"
 import { logActivity } from "@/lib/logActivity"
+import { softDelete } from "@/lib/softDelete"
 
 type Patient = {
   id: string
@@ -92,7 +93,7 @@ export default function AppointmentsPage() {
     loadAppointments()
   }, [])
 
-  const loadAppointments = async () => {
+  async function loadAppointments() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -228,25 +229,18 @@ export default function AppointmentsPage() {
   }
 
   const deleteAppointment = async (appointmentId: string) => {
-    const confirm = window.confirm("¿Eliminar esta cita?")
-    if (!confirm) return
-
     const appointment = appointments.find((a) => a.id === appointmentId)
+    const patientName = appointment?.patients?.full_name || "esta cita"
 
-    const { error } = await supabase
-      .from("appointments")
-      .delete()
-      .eq("id", appointmentId)
-
-    if (error) { alert(error.message); return }
-
-    await logActivity({
+    const deleted = await softDelete({
+      table: "appointments",
+      id: appointmentId,
       clinicId,
-      action: "eliminó cita de",
       entityType: "appointment",
-      entityId: appointmentId,
-      details: appointment?.patients?.full_name,
+      details: patientName,
+      confirmMessage: `¿Eliminar cita de "${patientName}"?\n\nEl registro quedará archivado.`,
     })
+    if (!deleted) return
 
     loadAppointments()
   }

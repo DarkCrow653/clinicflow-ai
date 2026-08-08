@@ -43,7 +43,7 @@ export default function ServicesPage() {
     loadServices()
   }, [])
 
-  const loadServices = async () => {
+  async function loadServices() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 

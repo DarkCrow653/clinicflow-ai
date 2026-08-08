@@ -6,7 +6,9 @@ import { supabase } from "@/lib/supabase"
 type Appointment = {
   id: string
   appointment_date: string
-  patients: any
+  patients: { full_name: string } | null
+  appointment_types?: { name: string } | null
+  status?: string
 }
 
 type ServiceStat = {
@@ -82,11 +84,7 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
 
-  useEffect(() => {
-    loadDashboard()
-  }, [])
-
-  const loadDashboard = async () => {
+  async function loadDashboard() {
     setLoading(true)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -133,8 +131,8 @@ export default function DashboardPage() {
     if (clinicRes.data) setClinicName(clinicRes.data.name)
     setTotalPatients(patientCountRes.count || 0)
     setTotalAppointments(appointmentCountRes.count || 0)
-    setTodayAppointments((todayRes.data as any[]) ?? [])
-    setTomorrowAppointments((tomorrowRes.data as any[]) ?? [])
+    setTodayAppointments((todayRes.data as Appointment[]) ?? [])
+    setTomorrowAppointments((tomorrowRes.data as Appointment[]) ?? [])
 
     if (profile.role === "admin") {
       // 👇 PARALELO 2 — todas las consultas de admin al mismo tiempo
@@ -192,8 +190,9 @@ export default function DashboardPage() {
 
       // Top servicios (citas)
       if (completedAptsRes.data) {
+        const completedApts = completedAptsRes.data as { appointment_types?: { name?: string } }[]
         const countMap: Record<string, number> = {}
-        completedAptsRes.data.forEach((apt: any) => {
+        completedApts.forEach((apt) => {
           const name = apt.appointment_types?.name
           if (name) countMap[name] = (countMap[name] || 0) + 1
         })
@@ -220,8 +219,8 @@ export default function DashboardPage() {
       setActiveTreatmentsCount(activePlans.length)
       setCompletedTreatmentsCount(completedPlans.length)
 
-      const getPlanPaid = (plan: any) =>
-        (plan.treatment_payments || []).reduce((sum: number, p: any) => sum + p.amount, 0)
+      const getPlanPaid = (plan: TreatmentPlanSummary) =>
+        (plan.treatment_payments || []).reduce((sum: number, p: PlanPayment) => sum + (p.amount || 0), 0)
 
       setPendingBalanceTotal(activePlans.reduce((sum, plan) => sum + (plan.total_amount - getPlanPaid(plan)), 0))
       setTotalBilled(nonCancelledPlans.reduce((sum, plan) => sum + plan.total_amount, 0))
@@ -233,9 +232,9 @@ export default function DashboardPage() {
       // Ingresos del mes desde pagos
       let monthlyFromPayments = 0
       allPlans.forEach((plan) => {
-        (plan.treatment_payments || []).forEach((payment: any) => {
-          if (payment.payment_date >= firstDayMonth && payment.payment_date <= lastDayMonth) {
-            monthlyFromPayments += payment.amount
+        (plan.treatment_payments || []).forEach((payment) => {
+          if (payment.payment_date && payment.payment_date >= firstDayMonth && payment.payment_date <= lastDayMonth) {
+            monthlyFromPayments += payment.amount || 0
           }
         })
       })
@@ -243,8 +242,9 @@ export default function DashboardPage() {
 
       // Top tratamientos dentales
       if (completedItemsRes.data) {
+        const completedItems = completedItemsRes.data as CompletedItem[]
         const treatmentMap: Record<string, { count: number; revenue: number }> = {}
-        completedItemsRes.data.forEach((item: any) => {
+        completedItems.forEach((item) => {
           const name = item.appointment_types?.name
           if (!name) return
           if (!treatmentMap[name]) treatmentMap[name] = { count: 0, revenue: 0 }
@@ -259,7 +259,7 @@ export default function DashboardPage() {
       }
 
       // Próximas citas
-      if (upcomingRes.data) setUpcomingAppointments(upcomingRes.data as any[])
+      if (upcomingRes.data) setUpcomingAppointments(upcomingRes.data as UpcomingAppointment[])
 
       // Actividad reciente
       if (activityRes.data) setRecentActivity(activityRes.data)
@@ -276,8 +276,8 @@ export default function DashboardPage() {
         })
       }
 
-      const uniquePatientIds = [...new Set(activePlans.map((p: any) => p.patient_id))]
-      const patientsWithFutureAppt = new Set((futureAppointmentsRes.data || []).map((a) => a.patient_id))
+      const uniquePatientIds = [...new Set(activePlans.map((p) => p.patient_id))]
+      const patientsWithFutureAppt = new Set(((futureAppointmentsRes.data || []) as { patient_id: string }[]).map((a) => a.patient_id))
       const patientsWithoutNext = uniquePatientIds.filter((id) => !patientsWithFutureAppt.has(id))
       if (patientsWithoutNext.length > 0) {
         newAlerts.push({
@@ -301,6 +301,14 @@ export default function DashboardPage() {
 
     setLoading(false)
   }
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      await loadDashboard()
+    }
+
+    void fetchDashboard()
+  }, [])
 
   const formatHour = (dateStr: string) =>
     new Date(dateStr).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })

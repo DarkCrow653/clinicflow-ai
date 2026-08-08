@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
+import { softDelete } from "@/lib/softDelete"
 
 type Patient = {
   id: string
@@ -124,6 +125,18 @@ export default function PatientsPage() {
     setErrors({})
     setSaving(false)
     loadPatients()
+  }
+
+  const deletePatient = async (id: string, name: string) => {
+    const deleted = await softDelete({
+      table: "patients",
+      id,
+      clinicId,
+      entityType: "patient",
+      details: name,
+      confirmMessage: `¿Eliminar paciente "${name}"?\n\nEl registro quedará archivado y podrá recuperarse si es necesario.`,
+    })
+    if (deleted) loadPatients()
   }
 
   return (

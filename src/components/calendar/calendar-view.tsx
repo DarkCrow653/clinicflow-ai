@@ -35,7 +35,7 @@ type Props = {
 }
 
 export default function CalendarView({ events, onEventDrop }: Props) {
-  const calendarRef = useRef<any>(null)
+  const calendarRef = useRef<unknown>(null)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
 
   const calendarEvents = events.map((event) => {
