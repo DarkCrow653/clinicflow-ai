@@ -103,7 +103,7 @@ export default function ReportsPage() {
       .eq("status", "completed")
       .order("appointment_date", { ascending: true })
 
-    const rows = ((data || []) as { appointment_date: string; price: number; appointment_types?: { name: string } | null }[]).map((a) => ({
+    const rows = ((data || []) as any[]).map((a) => ({
       fecha: new Date(a.appointment_date).toLocaleDateString("es-ES"),
       servicio: a.appointment_types?.name || "Sin servicio",
       importe: a.price || 0,
