@@ -219,8 +219,8 @@ export default function DashboardPage() {
       setActiveTreatmentsCount(activePlans.length)
       setCompletedTreatmentsCount(completedPlans.length)
 
-      const getPlanPaid = (plan: TreatmentPlanSummary) =>
-        (plan.treatment_payments || []).reduce((sum: number, p: PlanPayment) => sum + (p.amount || 0), 0)
+      const getPlanPaid = (plan: any) =>
+  (plan.treatment_payments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
 
       setPendingBalanceTotal(activePlans.reduce((sum, plan) => sum + (plan.total_amount - getPlanPaid(plan)), 0))
       setTotalBilled(nonCancelledPlans.reduce((sum, plan) => sum + plan.total_amount, 0))
