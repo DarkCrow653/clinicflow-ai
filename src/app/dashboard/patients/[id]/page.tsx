@@ -209,7 +209,7 @@ export default function PatientDetailPage() {
     }
 
     if (nextAptRes.data) {
-      const nextApt = nextAptRes.data as AppointmentWithType
+      const nextApt = nextAptRes.data as any
       setNextAppointment(nextApt)
     }
     setFileCount(filesRes.count ?? 0)
