@@ -5,6 +5,8 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
 import { softDelete } from "@/lib/softDelete"
+import ConfirmModal from "@/components/ui/confirm-modal"
+import { PatientListSkeleton } from "@/components/ui/skeleton"
 
 type Patient = {
   id: string
@@ -28,6 +30,11 @@ export default function PatientsPage() {
   const [search, setSearch] = useState("")
   const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // 👇 Modal de confirmación
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null)
 
   const filteredPatients = patients.filter((p) =>
     p.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -39,6 +46,8 @@ export default function PatientsPage() {
   }, [])
 
   const loadPatients = async () => {
+    setLoading(true)
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -51,7 +60,6 @@ export default function PatientsPage() {
     if (!profile) return
     setClinicId(profile.clinic_id)
 
-    // 👇 Lee el plan de la clínica
     const { data: clinic } = await supabase
       .from("clinics")
       .select("plan_id")
@@ -66,6 +74,7 @@ export default function PatientsPage() {
       .eq("clinic_id", profile.clinic_id)
 
     if (data) setPatients(data)
+    setLoading(false)
   }
 
   const validate = (): boolean => {
@@ -81,7 +90,6 @@ export default function PatientsPage() {
       newErrors.phone = "El teléfono debe tener al menos 7 dígitos."
     }
 
-    // 👇 Validación del plan
     if (planId === "free" && patients.length >= FREE_PATIENT_LIMIT) {
       newErrors.fullName = `Has alcanzado el límite de ${FREE_PATIENT_LIMIT} pacientes del plan Free. Actualiza a Pro para continuar.`
     }
@@ -127,17 +135,35 @@ export default function PatientsPage() {
     loadPatients()
   }
 
-  const deletePatient = async (id: string, name: string) => {
-    const deleted = await softDelete({
-      table: "patients",
-      id,
-      clinicId,
-      entityType: "patient",
-      details: name,
-      confirmMessage: `¿Eliminar paciente "${name}"?\n\nEl registro quedará archivado y podrá recuperarse si es necesario.`,
-    })
-    if (deleted) loadPatients()
+  const handleDeleteClick = (patient: Patient) => {
+    setPatientToDelete(patient)
+    setConfirmOpen(true)
   }
+
+  const confirmDelete = async () => {
+    if (!patientToDelete) return
+    setConfirmOpen(false)
+
+    const { error } = await supabase
+      .from("patients")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", patientToDelete.id)
+
+    if (!error) {
+      await logActivity({
+        clinicId,
+        action: "eliminó paciente",
+        entityType: "patient",
+        entityId: patientToDelete.id,
+        details: patientToDelete.full_name,
+      })
+    }
+
+    setPatientToDelete(null)
+    loadPatients()
+  }
+
+  if (loading) return <PatientListSkeleton />
 
   return (
     <div className="space-y-8 p-10">
@@ -215,15 +241,30 @@ export default function PatientsPage() {
           <p className="text-gray-400 text-sm">No se encontraron pacientes.</p>
         ) : (
           filteredPatients.map((patient) => (
-            <Link href={`/dashboard/patients/${patient.id}`} key={patient.id}>
-              <div className="rounded-2xl border bg-white shadow-sm p-4 hover:bg-gray-50 cursor-pointer">
+            <div key={patient.id} className="rounded-2xl border bg-white shadow-sm p-4 hover:bg-gray-50 flex items-center justify-between">
+              <Link href={`/dashboard/patients/${patient.id}`} className="flex-1">
                 <p className="font-bold">{patient.full_name}</p>
-                <p>{patient.phone}</p>
-              </div>
-            </Link>
+                <p className="text-sm text-gray-500">{patient.phone}</p>
+              </Link>
+              <button
+                onClick={() => handleDeleteClick(patient)}
+                className="rounded border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition ml-4"
+              >
+                Eliminar
+              </button>
+            </div>
           ))
         )}
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN */}
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Eliminar paciente"
+        description={`¿Estás seguro de que deseas eliminar a "${patientToDelete?.full_name}"? El registro quedará archivado.`}
+        onConfirm={confirmDelete}
+        onCancel={() => { setConfirmOpen(false); setPatientToDelete(null) }}
+      />
     </div>
   )
 }

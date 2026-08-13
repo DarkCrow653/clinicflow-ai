@@ -6,6 +6,7 @@ import Link from "next/link"
 import jsPDF from "jspdf"
 import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
+import ConfirmModal from "@/components/ui/confirm-modal"
 
 type Service = {
   id: string
@@ -41,13 +42,13 @@ type TreatmentPlan = {
   treatment_payments: Payment[]
 }
 
+type PlanErrors = {
+  title?: string
+}
+
 type ItemErrors = {
   serviceId?: string
   price?: string
-}
-
-type PlanErrors = {
-  title?: string
 }
 
 const PLAN_STATUS_LABELS: Record<string, string> = {
@@ -108,6 +109,16 @@ export default function TreatmentsPage() {
   const [paymentError, setPaymentError] = useState("")
   const [savingPayment, setSavingPayment] = useState(false)
 
+  // 👇 Modales de confirmación
+  const [confirmPlanOpen, setConfirmPlanOpen] = useState(false)
+  const [planToDelete, setPlanToDelete] = useState<TreatmentPlan | null>(null)
+
+  const [confirmItemOpen, setConfirmItemOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; planId: string; name: string } | null>(null)
+
+  const [confirmPaymentOpen, setConfirmPaymentOpen] = useState(false)
+  const [paymentToDelete, setPaymentToDelete] = useState<{ id: string; amount: number } | null>(null)
+
   useEffect(() => {
     if (params?.id) loadAll()
   }, [params])
@@ -154,7 +165,6 @@ export default function TreatmentsPage() {
     if (data) setPlans(data as TreatmentPlan[])
   }
 
-  // 👇 NUEVO — validar plan
   const validatePlan = (): boolean => {
     const newErrors: PlanErrors = {}
     if (!newPlanTitle.trim()) {
@@ -189,10 +199,24 @@ export default function TreatmentsPage() {
     loadPlans()
   }
 
-  const deletePlan = async (planId: string) => {
-    const confirm = window.confirm("¿Eliminar este plan de tratamiento y todos sus procedimientos?")
-    if (!confirm) return
-    await supabase.from("treatment_plans").delete().eq("id", planId)
+  const confirmDeletePlan = async () => {
+    if (!planToDelete) return
+    setConfirmPlanOpen(false)
+
+    await supabase
+      .from("treatment_plans")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", planToDelete.id)
+
+    await logActivity({
+      clinicId,
+      action: "eliminó plan de tratamiento",
+      entityType: "treatment",
+      entityId: planToDelete.id,
+      details: planToDelete.title,
+    })
+
+    setPlanToDelete(null)
     loadPlans()
   }
 
@@ -213,18 +237,14 @@ export default function TreatmentsPage() {
     await supabase.from("treatment_plans").update({ total_amount: total }).eq("id", planId)
   }
 
-  // 👇 NUEVO — validar procedimiento
   const validateItem = (): boolean => {
     const newErrors: ItemErrors = {}
-
     if (!itemServiceId) newErrors.serviceId = "Selecciona un servicio."
-
     if (!itemPrice) {
       newErrors.price = "El precio es obligatorio."
     } else if (parseFloat(itemPrice) <= 0) {
       newErrors.price = "El precio debe ser mayor a cero."
     }
-
     setItemErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -242,7 +262,6 @@ export default function TreatmentsPage() {
     })
 
     await recalcPlanTotal(planId)
-
     setItemTooth("")
     setItemServiceId("")
     setItemPrice("")
@@ -263,9 +282,14 @@ export default function TreatmentsPage() {
     loadPlans()
   }
 
-  const deleteItem = async (itemId: string, planId: string) => {
-    await supabase.from("treatment_items").delete().eq("id", itemId)
-    await recalcPlanTotal(planId)
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete) return
+    setConfirmItemOpen(false)
+
+    await supabase.from("treatment_items").delete().eq("id", itemToDelete.id)
+    await recalcPlanTotal(itemToDelete.planId)
+
+    setItemToDelete(null)
     loadPlans()
   }
 
@@ -296,7 +320,6 @@ export default function TreatmentsPage() {
     setPaymentError("")
   }
 
-  // 👇 NUEVO — validación de pago mejorada
   const addPayment = async (plan: TreatmentPlan) => {
     const amount = parseFloat(paymentAmount)
 
@@ -304,19 +327,16 @@ export default function TreatmentsPage() {
       setPaymentError("El monto es obligatorio.")
       return
     }
-
     if (isNaN(amount) || amount <= 0) {
       setPaymentError("El monto debe ser mayor a cero.")
       return
     }
 
     const balance = getBalance(plan)
-
     if (balance <= 0) {
       setPaymentError("Este plan ya está completamente pagado.")
       return
     }
-
     if (amount > balance) {
       setPaymentError(`El pago ($${amount}) supera el saldo pendiente ($${balance}).`)
       return
@@ -354,19 +374,20 @@ export default function TreatmentsPage() {
     loadPlans()
   }
 
-  const deletePayment = async (paymentId: string, amount: number) => {
-    const confirm = window.confirm("¿Eliminar este pago? Esta acción no se puede deshacer.")
-    if (!confirm) return
+  const confirmDeletePayment = async () => {
+    if (!paymentToDelete) return
+    setConfirmPaymentOpen(false)
 
-    await supabase.from("treatment_payments").delete().eq("id", paymentId)
+    await supabase.from("treatment_payments").delete().eq("id", paymentToDelete.id)
 
     await logActivity({
       clinicId,
-      action: `eliminó un pago de $${amount} de`,
+      action: `eliminó un pago de $${paymentToDelete.amount} de`,
       entityType: "payment",
       details: patientName,
     })
 
+    setPaymentToDelete(null)
     loadPlans()
   }
 
@@ -583,7 +604,7 @@ export default function TreatmentsPage() {
                     📄 Presupuesto
                   </button>
                   <button
-                    onClick={() => deletePlan(plan.id)}
+                    onClick={() => { setPlanToDelete(plan); setConfirmPlanOpen(true) }}
                     className="rounded border border-red-200 px-3 py-1 text-xs text-red-500 hover:bg-red-50"
                   >
                     Eliminar plan
@@ -652,7 +673,14 @@ export default function TreatmentsPage() {
                           ))}
                         </select>
                         <button
-                          onClick={() => deleteItem(item.id, plan.id)}
+                          onClick={() => {
+                            setItemToDelete({
+                              id: item.id,
+                              planId: plan.id,
+                              name: item.appointment_types?.name || "procedimiento",
+                            })
+                            setConfirmItemOpen(true)
+                          }}
                           className="text-xs text-red-400 hover:text-red-600"
                         >
                           Eliminar
@@ -757,7 +785,10 @@ export default function TreatmentsPage() {
                             🧾 Recibo
                           </button>
                           <button
-                            onClick={() => deletePayment(payment.id, payment.amount)}
+                            onClick={() => {
+                              setPaymentToDelete({ id: payment.id, amount: payment.amount })
+                              setConfirmPaymentOpen(true)
+                            }}
                             className="text-xs text-red-400 hover:text-red-600"
                           >
                             Eliminar
@@ -801,16 +832,12 @@ export default function TreatmentsPage() {
                     value={paymentNotes}
                     onChange={(e) => setPaymentNotes(e.target.value)}
                   />
-
-                  {/* 👇 Muestra el saldo disponible */}
                   <p className="text-xs text-gray-500">
                     Saldo pendiente: <strong>${balance}</strong>
                   </p>
-
                   {paymentError && (
                     <p className="text-sm text-red-500">{paymentError}</p>
                   )}
-
                   <div className="flex gap-2">
                     <button
                       onClick={() => addPayment(plan)}
@@ -839,6 +866,31 @@ export default function TreatmentsPage() {
           )
         })
       )}
+
+      {/* MODALES DE CONFIRMACIÓN */}
+      <ConfirmModal
+        isOpen={confirmPlanOpen}
+        title="Eliminar plan de tratamiento"
+        description={`¿Estás seguro de que deseas eliminar el plan "${planToDelete?.title}"? Todos sus procedimientos quedarán archivados.`}
+        onConfirm={confirmDeletePlan}
+        onCancel={() => { setConfirmPlanOpen(false); setPlanToDelete(null) }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmItemOpen}
+        title="Eliminar procedimiento"
+        description={`¿Estás seguro de que deseas eliminar el procedimiento "${itemToDelete?.name}"?`}
+        onConfirm={confirmDeleteItem}
+        onCancel={() => { setConfirmItemOpen(false); setItemToDelete(null) }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmPaymentOpen}
+        title="Eliminar pago"
+        description={`¿Estás seguro de que deseas eliminar el pago de $${paymentToDelete?.amount}? Esta acción no se puede deshacer.`}
+        onConfirm={confirmDeletePayment}
+        onCancel={() => { setConfirmPaymentOpen(false); setPaymentToDelete(null) }}
+      />
     </div>
   )
 }

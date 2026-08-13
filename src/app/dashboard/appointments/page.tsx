@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import CalendarView from "@/components/calendar/calendar-view"
 import { logActivity } from "@/lib/logActivity"
-import { softDelete } from "@/lib/softDelete"
+import ConfirmModal from "@/components/ui/confirm-modal"
+import { AppointmentListSkeleton } from "@/components/ui/skeleton"
 
 type Patient = {
   id: string
@@ -24,7 +25,7 @@ type Appointment = {
   status: string
   price: number
   patients: { full_name: string }
-  appointment_types: { name: string; price: number } | null
+  appointment_types: { name: string; price: number; duration_minutes?: number } | null
 }
 
 type FormErrors = {
@@ -62,6 +63,11 @@ export default function AppointmentsPage() {
   const [selectedDuration, setSelectedDuration] = useState(0)
   const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // 👇 Modal de confirmación
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null)
 
   const filteredAppointments = appointments.filter((a) =>
     activeFilter === "todas" ? true : a.status === activeFilter
@@ -87,13 +93,17 @@ export default function AppointmentsPage() {
     title: apt.patients?.full_name || "Paciente",
     date: apt.appointment_date,
     status: apt.status,
+    duration: apt.appointment_types?.duration_minutes || 30,
+    serviceName: apt.appointment_types?.name,
   }))
 
   useEffect(() => {
     loadAppointments()
   }, [])
 
-  async function loadAppointments() {
+  const loadAppointments = async () => {
+    setLoading(true)
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -123,11 +133,12 @@ export default function AppointmentsPage() {
 
     const { data: appointmentsData } = await supabase
       .from("appointments")
-      .select(`*, patients (full_name), appointment_types (name, price)`)
+      .select(`*, patients (full_name), appointment_types (name, price, duration_minutes)`)
       .eq("clinic_id", profile.clinic_id)
       .order("appointment_date", { ascending: true })
 
     if (appointmentsData) setAppointments(appointmentsData as Appointment[])
+    setLoading(false)
   }
 
   const handleServiceChange = (serviceId: string) => {
@@ -143,7 +154,6 @@ export default function AppointmentsPage() {
     }
   }
 
-  // 👇 NUEVO — validación
   const validate = (): boolean => {
     const newErrors: FormErrors = {}
 
@@ -228,33 +238,13 @@ export default function AppointmentsPage() {
     loadAppointments()
   }
 
-  const deleteAppointment = async (appointmentId: string) => {
-    const appointment = appointments.find((a) => a.id === appointmentId)
-    const patientName = appointment?.patients?.full_name || "esta cita"
-
-    const deleted = await softDelete({
-      table: "appointments",
-      id: appointmentId,
-      clinicId,
-      entityType: "appointment",
-      details: patientName,
-      confirmMessage: `¿Eliminar cita de "${patientName}"?\n\nEl registro quedará archivado.`,
-    })
-    if (!deleted) return
-
-    loadAppointments()
-  }
-
   const rescheduleAppointment = async (appointmentId: string, newDate: string) => {
     const { error } = await supabase
       .from("appointments")
       .update({ appointment_date: newDate })
       .eq("id", appointmentId)
 
-    if (error) {
-      alert(error.message)
-      return
-    }
+    if (error) { alert(error.message); return }
 
     await logActivity({
       clinicId,
@@ -267,6 +257,36 @@ export default function AppointmentsPage() {
     loadAppointments()
   }
 
+  const handleDeleteClick = (appointment: Appointment) => {
+    setAppointmentToDelete(appointment)
+    setConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!appointmentToDelete) return
+    setConfirmOpen(false)
+
+    const { error } = await supabase
+      .from("appointments")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", appointmentToDelete.id)
+
+    if (!error) {
+      await logActivity({
+        clinicId,
+        action: "eliminó cita de",
+        entityType: "appointment",
+        entityId: appointmentToDelete.id,
+        details: appointmentToDelete.patients?.full_name,
+      })
+    }
+
+    setAppointmentToDelete(null)
+    loadAppointments()
+  }
+
+  if (loading) return <AppointmentListSkeleton />
+
   return (
     <div className="space-y-8 p-10">
       <div>
@@ -277,7 +297,6 @@ export default function AppointmentsPage() {
       <div className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="text-2xl font-bold">Nueva cita</h2>
 
-        {/* PACIENTE */}
         <div>
           <select
             className={`w-full rounded border p-2 ${errors.patientId ? "border-red-400 bg-red-50" : ""}`}
@@ -299,7 +318,6 @@ export default function AppointmentsPage() {
           )}
         </div>
 
-        {/* SERVICIO */}
         <div>
           <select
             className={`w-full rounded border p-2 ${errors.serviceId ? "border-red-400 bg-red-50" : ""}`}
@@ -325,7 +343,6 @@ export default function AppointmentsPage() {
           </div>
         )}
 
-        {/* FECHA */}
         <div>
           <input
             type="datetime-local"
@@ -418,7 +435,7 @@ export default function AppointmentsPage() {
                     </select>
 
                     <button
-                      onClick={() => deleteAppointment(appointment.id)}
+                      onClick={() => handleDeleteClick(appointment)}
                       className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"
                     >
                       Eliminar
@@ -439,6 +456,15 @@ export default function AppointmentsPage() {
           onEventDrop={rescheduleAppointment}
         />
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN */}
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Eliminar cita"
+        description={`¿Estás seguro de que deseas eliminar la cita de "${appointmentToDelete?.patients?.full_name}"? El registro quedará archivado.`}
+        onConfirm={confirmDelete}
+        onCancel={() => { setConfirmOpen(false); setAppointmentToDelete(null) }}
+      />
     </div>
   )
 }
