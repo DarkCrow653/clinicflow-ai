@@ -15,6 +15,7 @@ import {
   FileSpreadsheet,
   Settings,
   Zap,
+  ArrowLeft,
 } from "lucide-react"
 
 import { supabase } from "@/lib/supabase"
@@ -23,10 +24,13 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const [role, setRole] = useState<string>("")
+  const [isDemo, setIsDemo] = useState(false)
 
   async function loadRole() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
+    setIsDemo(user.email === "demo@clinicflow.ai")
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -48,6 +52,11 @@ export default function Sidebar() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push("/login")
+  }
+
+  const handleBackToLanding = async () => {
+    await supabase.auth.signOut()
+    router.push("/")
   }
 
   const allLinks = [
@@ -115,7 +124,11 @@ export default function Sidebar() {
       <div className="shrink-0">
         <h1 className="text-3xl font-bold">ClinicFlow</h1>
         <p className="text-sm text-gray-500">AI Clinic SaaS</p>
-        {role && (
+        {isDemo ? (
+          <span className="mt-2 inline-block rounded-full border border-yellow-300 bg-yellow-50 px-2 py-0.5 text-xs text-yellow-700">
+            👀 Modo Demo
+          </span>
+        ) : role && (
           <span className="mt-2 inline-block rounded-full border px-2 py-0.5 text-xs text-gray-500 capitalize">
             {role === "admin" ? "Admin" : role === "doctor" ? "Doctor" : "Recepción"}
           </span>
@@ -144,14 +157,23 @@ export default function Sidebar() {
         })}
       </div>
 
-      {/* LOGOUT — fijo abajo */}
-      <button
-        onClick={handleLogout}
-        className="mt-4 flex shrink-0 items-center justify-center gap-2 rounded-lg bg-black p-3 text-white"
-      >
-        <LogOut size={18} />
-        Logout
-      </button>
+      {isDemo ? (
+        <button
+          onClick={handleBackToLanding}
+          className="mt-4 flex shrink-0 items-center justify-center gap-2 rounded-lg border px-3 py-3 text-sm text-gray-600 hover:bg-gray-50 transition"
+        >
+          <ArrowLeft size={18} />
+          Volver al inicio
+        </button>
+      ) : (
+        <button
+          onClick={handleLogout}
+          className="mt-4 flex shrink-0 items-center justify-center gap-2 rounded-lg bg-black p-3 text-white"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
+      )}
     </div>
   )
 }

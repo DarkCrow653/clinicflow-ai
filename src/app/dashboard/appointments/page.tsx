@@ -6,6 +6,7 @@ import CalendarView from "@/components/calendar/calendar-view"
 import { logActivity } from "@/lib/logActivity"
 import ConfirmModal from "@/components/ui/confirm-modal"
 import { AppointmentListSkeleton } from "@/components/ui/skeleton"
+import DemoBlock from "@/components/ui/demo-block"
 
 type Patient = {
   id: string
@@ -294,7 +295,8 @@ export default function AppointmentsPage() {
       </div>
 
       {/* FORMULARIO */}
-      <div className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
+      <DemoBlock>
+        <div className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
         <h2 className="text-2xl font-bold">Nueva cita</h2>
 
         <div>
@@ -366,7 +368,8 @@ export default function AppointmentsPage() {
         >
           {saving ? "Creando..." : "Crear cita"}
         </button>
-      </div>
+        </div>
+      </DemoBlock>
 
       {/* AGENDA */}
       <div className="space-y-4">
@@ -424,22 +427,26 @@ export default function AppointmentsPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <select
-                      value={appointment.status}
-                      onChange={(e) => updateStatus(appointment.id, e.target.value)}
-                      className="rounded border p-2 text-sm"
-                    >
-                      {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
+                    <DemoBlock>
+                      <select
+                        value={appointment.status}
+                        onChange={(e) => updateStatus(appointment.id, e.target.value)}
+                        className="rounded border p-2 text-sm"
+                      >
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </DemoBlock>
 
-                    <button
-                      onClick={() => handleDeleteClick(appointment)}
-                      className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"
-                    >
-                      Eliminar
-                    </button>
+                    <DemoBlock>
+                      <button
+                        onClick={() => handleDeleteClick(appointment)}
+                        className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"
+                      >
+                        Eliminar
+                      </button>
+                    </DemoBlock>
                   </div>
                 </div>
               ))}
@@ -451,10 +458,12 @@ export default function AppointmentsPage() {
       {/* CALENDARIO */}
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Calendario</h2>
-        <CalendarView
-          events={calendarEvents}
-          onEventDrop={rescheduleAppointment}
-        />
+        <DemoBlock fallback={<CalendarView events={calendarEvents} />}>
+          <CalendarView
+            events={calendarEvents}
+            onEventDrop={rescheduleAppointment}
+          />
+        </DemoBlock>
       </div>
 
       {/* MODAL DE CONFIRMACIÓN */}

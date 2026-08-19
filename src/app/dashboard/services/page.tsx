@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
+import DemoBlock from "@/components/ui/demo-block"
 
 type AppointmentType = {
   id: string
@@ -223,7 +224,8 @@ export default function ServicesPage() {
       </div>
 
       {/* FORMULARIO NUEVO SERVICIO */}
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+      <DemoBlock>
+        <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-2xl font-bold">Nuevo servicio</h2>
 
         {/* NOMBRE */}
@@ -281,7 +283,8 @@ export default function ServicesPage() {
         >
           {saving ? "Creando..." : "Crear servicio"}
         </button>
-      </div>
+        </div>
+      </DemoBlock>
 
       {/* LISTA DE SERVICIOS */}
       <div className="space-y-3">
@@ -291,6 +294,7 @@ export default function ServicesPage() {
           services.map((service) => (
             <div key={service.id} className="rounded-2xl border bg-white p-4 shadow-sm">
               {editingId === service.id ? (
+                <DemoBlock>
                 <div className="space-y-3">
 
                   {/* EDITAR NOMBRE */}
@@ -356,6 +360,7 @@ export default function ServicesPage() {
                     </button>
                   </div>
                 </div>
+                </DemoBlock>
               ) : (
                 <div className="flex items-center justify-between">
                   <div>
@@ -365,18 +370,22 @@ export default function ServicesPage() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => startEdit(service)}
-                      className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => deleteService(service.id)}
-                      className="rounded border border-red-200 px-3 py-1 text-sm text-red-500 hover:bg-red-50"
-                    >
-                      Eliminar
-                    </button>
+                    <DemoBlock>
+                      <button
+                        onClick={() => startEdit(service)}
+                        className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
+                      >
+                        Editar
+                      </button>
+                    </DemoBlock>
+                    <DemoBlock>
+                      <button
+                        onClick={() => deleteService(service.id)}
+                        className="rounded border border-red-200 px-3 py-1 text-sm text-red-500 hover:bg-red-50"
+                      >
+                        Eliminar
+                      </button>
+                    </DemoBlock>
                   </div>
                 </div>
               )}

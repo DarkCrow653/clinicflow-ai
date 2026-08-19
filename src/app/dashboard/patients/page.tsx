@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/logActivity"
 import { softDelete } from "@/lib/softDelete"
 import ConfirmModal from "@/components/ui/confirm-modal"
 import { PatientListSkeleton } from "@/components/ui/skeleton"
+import DemoBlock from "@/components/ui/demo-block"
 
 type Patient = {
   id: string
@@ -183,7 +184,8 @@ export default function PatientsPage() {
         onChange={(e) => setSearch(e.target.value)}
       />
 
-      <div className="space-y-4 rounded-2xl border bg-white shadow-sm p-6">
+      <DemoBlock>
+        <div className="space-y-4 rounded-2xl border bg-white shadow-sm p-6">
         <h2 className="text-2xl font-bold">Nuevo Paciente</h2>
 
         <div>
@@ -234,7 +236,8 @@ export default function PatientsPage() {
         >
           {saving ? "Creando..." : "Crear paciente"}
         </button>
-      </div>
+        </div>
+      </DemoBlock>
 
       <div className="space-y-4">
         {filteredPatients.length === 0 ? (
@@ -246,12 +249,14 @@ export default function PatientsPage() {
                 <p className="font-bold">{patient.full_name}</p>
                 <p className="text-sm text-gray-500">{patient.phone}</p>
               </Link>
-              <button
-                onClick={() => handleDeleteClick(patient)}
-                className="rounded border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition ml-4"
-              >
-                Eliminar
-              </button>
+              <DemoBlock>
+                <button
+                  onClick={() => handleDeleteClick(patient)}
+                  className="rounded border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition ml-4"
+                >
+                  Eliminar
+                </button>
+              </DemoBlock>
             </div>
           ))
         )}

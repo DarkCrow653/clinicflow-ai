@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { logActivity } from "@/lib/logActivity"
 import { softDelete } from "@/lib/softDelete"
 import Link from "next/link"
+import DemoBlock from "@/components/ui/demo-block"
 
 type Patient = {
   id: string
@@ -463,12 +464,14 @@ export default function PatientDetailPage() {
             <p className="text-gray-600">{patient.email}</p>
 
             <div className="flex flex-wrap gap-2 mt-3">
-              <button
-                onClick={() => setIsEditing(true)}
-                className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
-              >
-                Editar datos
-              </button>
+              <DemoBlock>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  Editar datos
+                </button>
+              </DemoBlock>
 
               {canSeeClinicalData && (
                 <>
@@ -586,16 +589,19 @@ export default function PatientDetailPage() {
         <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Historial Clínico</h2>
-            <button
-              onClick={openNewForm}
-              className="rounded bg-black px-4 py-2 text-sm text-white"
-            >
-              + Nueva consulta
-            </button>
+            <DemoBlock>
+              <button
+                onClick={openNewForm}
+                className="rounded bg-black px-4 py-2 text-sm text-white"
+              >
+                + Nueva consulta
+              </button>
+            </DemoBlock>
           </div>
 
           {showForm && (
-            <div className="rounded-xl border bg-gray-50 p-5 space-y-3">
+            <DemoBlock>
+              <div className="rounded-xl border bg-gray-50 p-5 space-y-3">
               <h3 className="font-semibold text-sm text-gray-700">
                 {editingRecordId ? "Editar consulta" : "Nueva consulta"}
               </h3>
@@ -686,7 +692,8 @@ export default function PatientDetailPage() {
                   Cancelar
                 </button>
               </div>
-            </div>
+              </div>
+            </DemoBlock>
           )}
 
           <div className="space-y-3 mt-4">
@@ -700,12 +707,16 @@ export default function PatientDetailPage() {
                       Consulta {formatDate(record.consultation_date)}
                     </span>
                     <div className="flex items-center gap-3">
-                      <button onClick={() => openEditForm(record)} className="text-xs text-gray-500 hover:text-black">
-                        Editar
-                      </button>
-                      <button onClick={() => deleteRecord(record.id, record.consultation_date)} className="text-xs text-red-400 hover:text-red-600">
-                        Eliminar
-                      </button>
+                      <DemoBlock>
+                        <button onClick={() => openEditForm(record)} className="text-xs text-gray-500 hover:text-black">
+                          Editar
+                        </button>
+                      </DemoBlock>
+                      <DemoBlock>
+                        <button onClick={() => deleteRecord(record.id, record.consultation_date)} className="text-xs text-red-400 hover:text-red-600">
+                          Eliminar
+                        </button>
+                      </DemoBlock>
                     </div>
                   </div>
 
