@@ -14,11 +14,14 @@ export default function DashboardLayout({
     >
       <DemoBanner />
       <div className="flex flex-1 overflow-hidden">
-        <aside style={{ height: "100%", overflow: "hidden", flexShrink: 0 }}>
+        {/* Sidebar — oculto en móvil, visible en desktop */}
+        <aside className="hidden md:flex h-full shrink-0 overflow-hidden">
           <Sidebar />
         </aside>
 
-        <main style={{ flex: 1, overflowY: "auto" }}>
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          {/* Topbar móvil — solo visible en móvil */}
+          <MobileTopbar />
           <PlanBanner />
           {children}
         </main>
@@ -26,3 +29,6 @@ export default function DashboardLayout({
     </div>
   )
 }
+
+// 👇 Importamos el topbar aquí para mantener el layout server component
+import MobileTopbar from "@/components/dashboard/mobile-topbar"
