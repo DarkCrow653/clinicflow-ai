@@ -534,21 +534,21 @@ export default function TreatmentsPage() {
   }
 
   return (
-    <div className="space-y-6 p-10">
+    <div className="space-y-5 p-4 md:p-10">
       <div>
         <Link href={`/dashboard/patients/${params.id}`} className="text-sm text-gray-400 hover:text-black">
           ← Volver a {patientName}
         </Link>
-        <h1 className="text-3xl font-bold mt-1">Planes de Tratamiento</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mt-1">Planes de Tratamiento</h1>
       </div>
 
       {/* NUEVO PLAN */}
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
-        <h2 className="text-lg font-bold">Nuevo plan de tratamiento</h2>
+      <div className="rounded-2xl border bg-white p-4 md:p-6 shadow-sm space-y-3">
+        <h2 className="text-base md:text-lg font-bold">Nuevo plan de tratamiento</h2>
         <div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
-              className={`flex-1 rounded border p-2 text-sm ${planErrors.title ? "border-red-400 bg-red-50" : ""}`}
+              className={`flex-1 rounded border p-3 text-sm ${planErrors.title ? "border-red-400 bg-red-50" : ""}`}
               placeholder="Ej. Plan Dental Integral *"
               value={newPlanTitle}
               onChange={(e) => {
@@ -559,7 +559,7 @@ export default function TreatmentsPage() {
             <button
               onClick={createPlan}
               disabled={savingPlan}
-              className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+              className="rounded-lg bg-black px-4 py-3 text-sm text-white disabled:opacity-50 whitespace-nowrap"
             >
               {savingPlan ? "Creando..." : "Crear plan"}
             </button>
@@ -581,51 +581,51 @@ export default function TreatmentsPage() {
           const financialStatus = getFinancialStatus(plan)
 
           return (
-            <div key={plan.id} className="rounded-2xl border bg-white p-6 shadow-sm space-y-5">
+            <div key={plan.id} className="rounded-2xl border bg-white p-4 md:p-6 shadow-sm space-y-4">
 
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-xl font-bold">{plan.title}</h3>
-                </div>
-                <div className="flex items-center gap-2">
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-lg md:text-xl font-bold">{plan.title}</h3>
                   <select
                     value={plan.status}
                     onChange={(e) => updatePlanStatus(plan.id, e.target.value)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium ${PLAN_STATUS_STYLES[plan.status]}`}
+                    className={`flex-shrink-0 rounded-full border px-2 py-1 text-xs font-medium ${PLAN_STATUS_STYLES[plan.status]}`}
                   >
                     {Object.entries(PLAN_STATUS_LABELS).map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
+                </div>
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => generateBudgetPDF(plan)}
-                    className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
+                    className="rounded border px-3 py-1.5 text-xs hover:bg-gray-50"
                   >
                     📄 Presupuesto
                   </button>
                   <button
                     onClick={() => { setPlanToDelete(plan); setConfirmPlanOpen(true) }}
-                    className="rounded border border-red-200 px-3 py-1 text-xs text-red-500 hover:bg-red-50"
+                    className="rounded border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50"
                   >
                     Eliminar plan
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div className="rounded-xl border bg-gray-50 p-3">
-                  <p className="text-xs text-gray-500">Total Tratamiento</p>
-                  <p className="text-lg font-bold">${plan.total_amount}</p>
+              <div className="grid grid-cols-2 gap-2 md:gap-3 md:grid-cols-4">
+                <div className="rounded-xl border bg-gray-50 p-2 md:p-3">
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="text-base md:text-lg font-bold">${plan.total_amount}</p>
                 </div>
-                <div className="rounded-xl border bg-gray-50 p-3">
+                <div className="rounded-xl border bg-gray-50 p-2 md:p-3">
                   <p className="text-xs text-gray-500">Pagado</p>
-                  <p className="text-lg font-bold text-green-600">${totalPaid}</p>
+                  <p className="text-base md:text-lg font-bold text-green-600">${totalPaid}</p>
                 </div>
-                <div className="rounded-xl border bg-gray-50 p-3">
+                <div className="rounded-xl border bg-gray-50 p-2 md:p-3">
                   <p className="text-xs text-gray-500">Pendiente</p>
-                  <p className="text-lg font-bold text-red-600">${balance}</p>
+                  <p className="text-base md:text-lg font-bold text-red-600">${balance}</p>
                 </div>
-                <div className="rounded-xl border bg-gray-50 p-3 flex flex-col">
+                <div className="rounded-xl border bg-gray-50 p-2 md:p-3 flex flex-col">
                   <p className="text-xs text-gray-500">Estado</p>
                   <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-xs font-medium w-fit ${FINANCIAL_STATUS_STYLES[financialStatus]}`}>
                     {financialStatus}
@@ -635,8 +635,8 @@ export default function TreatmentsPage() {
 
               <div>
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                  <span>Progreso de procedimientos</span>
-                  <span>{progress}% completado</span>
+                  <span>Progreso</span>
+                  <span>{progress}%</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
                   <div
@@ -652,17 +652,17 @@ export default function TreatmentsPage() {
                   <p className="text-gray-400 text-sm">Sin procedimientos aún.</p>
                 ) : (
                   plan.treatment_items.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded-xl border p-3">
-                      <div>
-                        <p className="text-sm font-medium">
+                    <div key={item.id} className="flex items-center justify-between rounded-xl border p-3 gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">
                           {item.appointment_types?.name || "Servicio"}
                           {item.tooth_number && (
-                            <span className="text-gray-400"> · Pieza {item.tooth_number}</span>
+                            <span className="text-gray-400"> · P{item.tooth_number}</span>
                           )}
                         </p>
                         <p className="text-xs text-gray-500">${item.price}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <select
                           value={item.status}
                           onChange={(e) => updateItemStatus(item.id, plan.id, e.target.value)}
@@ -681,9 +681,9 @@ export default function TreatmentsPage() {
                             })
                             setConfirmItemOpen(true)
                           }}
-                          className="text-xs text-red-400 hover:text-red-600"
+                          className="text-xs text-red-400 hover:text-red-600 p-1"
                         >
-                          Eliminar
+                          ✕
                         </button>
                       </div>
                     </div>
@@ -695,14 +695,14 @@ export default function TreatmentsPage() {
                 <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     <input
-                      className="rounded border p-2 text-sm"
+                      className="rounded border p-3 text-sm"
                       placeholder="Pieza (opcional)"
                       value={itemTooth}
                       onChange={(e) => setItemTooth(e.target.value.replace(/[^0-9]/g, ""))}
                     />
                     <div>
                       <select
-                        className={`w-full rounded border p-2 text-sm ${itemErrors.serviceId ? "border-red-400 bg-red-50" : ""}`}
+                        className={`w-full rounded border p-3 text-sm ${itemErrors.serviceId ? "border-red-400 bg-red-50" : ""}`}
                         value={itemServiceId}
                         onChange={(e) => handleServiceChange(e.target.value)}
                       >
@@ -717,7 +717,7 @@ export default function TreatmentsPage() {
                     </div>
                     <div>
                       <input
-                        className={`w-full rounded border p-2 text-sm ${itemErrors.price ? "border-red-400 bg-red-50" : ""}`}
+                        className={`w-full rounded border p-3 text-sm ${itemErrors.price ? "border-red-400 bg-red-50" : ""}`}
                         type="number"
                         placeholder="Precio *"
                         value={itemPrice}
@@ -736,13 +736,13 @@ export default function TreatmentsPage() {
                     <button
                       onClick={() => addItem(plan.id)}
                       disabled={savingItem}
-                      className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                      className="flex-1 md:flex-none rounded-lg bg-black px-4 py-3 text-sm text-white disabled:opacity-50"
                     >
                       {savingItem ? "Agregando..." : "Agregar"}
                     </button>
                     <button
                       onClick={() => { setOpenItemForm(null); setItemErrors({}) }}
-                      className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                      className="flex-1 md:flex-none rounded-lg border px-4 py-3 text-sm text-gray-600 hover:bg-gray-100"
                     >
                       Cancelar
                     </button>
@@ -751,7 +751,7 @@ export default function TreatmentsPage() {
               ) : (
                 <button
                   onClick={() => { setOpenItemForm(plan.id); setItemErrors({}) }}
-                  className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+                  className="w-full md:w-auto rounded border px-4 py-2.5 text-sm hover:bg-gray-50"
                 >
                   + Agregar procedimiento
                 </button>
@@ -766,8 +766,8 @@ export default function TreatmentsPage() {
                   plan.treatment_payments
                     .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
                     .map((payment) => (
-                      <div key={payment.id} className="flex items-center justify-between rounded-xl border p-3">
-                        <div>
+                      <div key={payment.id} className="flex items-start justify-between rounded-xl border p-3 gap-2">
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium">
                             {formatDate(payment.payment_date)} · {PAYMENT_METHOD_LABELS[payment.payment_method]}
                           </p>
@@ -777,21 +777,21 @@ export default function TreatmentsPage() {
                           </p>
                           <p className="text-xs text-gray-400">{payment.receipt_number}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <button
                             onClick={() => generateReceiptPDF(plan, payment)}
-                            className="rounded border px-3 py-1 text-xs hover:bg-gray-50"
+                            className="rounded border px-2 py-1.5 text-xs hover:bg-gray-50"
                           >
-                            🧾 Recibo
+                            🧾
                           </button>
                           <button
                             onClick={() => {
                               setPaymentToDelete({ id: payment.id, amount: payment.amount })
                               setConfirmPaymentOpen(true)
                             }}
-                            className="text-xs text-red-400 hover:text-red-600"
+                            className="text-xs text-red-400 hover:text-red-600 p-1"
                           >
-                            Eliminar
+                            ✕
                           </button>
                         </div>
                       </div>
@@ -802,22 +802,20 @@ export default function TreatmentsPage() {
               {/* FORMULARIO AGREGAR PAGO */}
               {openPaymentForm === plan.id ? (
                 <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div>
-                      <input
-                        className={`w-full rounded border p-2 text-sm ${paymentError && !paymentAmount ? "border-red-400 bg-red-50" : ""}`}
-                        type="number"
-                        placeholder="Monto *"
-                        min="0"
-                        value={paymentAmount}
-                        onChange={(e) => {
-                          setPaymentAmount(e.target.value)
-                          if (paymentError) setPaymentError("")
-                        }}
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <input
+                      className={`w-full rounded border p-3 text-sm ${paymentError && !paymentAmount ? "border-red-400 bg-red-50" : ""}`}
+                      type="number"
+                      placeholder="Monto *"
+                      min="0"
+                      value={paymentAmount}
+                      onChange={(e) => {
+                        setPaymentAmount(e.target.value)
+                        if (paymentError) setPaymentError("")
+                      }}
+                    />
                     <select
-                      className="rounded border p-2 text-sm"
+                      className="rounded border p-3 text-sm"
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                     >
@@ -827,7 +825,7 @@ export default function TreatmentsPage() {
                     </select>
                   </div>
                   <input
-                    className="w-full rounded border p-2 text-sm"
+                    className="w-full rounded border p-3 text-sm"
                     placeholder="Observaciones (opcional)"
                     value={paymentNotes}
                     onChange={(e) => setPaymentNotes(e.target.value)}
@@ -842,13 +840,13 @@ export default function TreatmentsPage() {
                     <button
                       onClick={() => addPayment(plan)}
                       disabled={savingPayment}
-                      className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                      className="flex-1 md:flex-none rounded-lg bg-black px-4 py-3 text-sm text-white disabled:opacity-50"
                     >
                       {savingPayment ? "Registrando..." : "Registrar Pago"}
                     </button>
                     <button
                       onClick={() => setOpenPaymentForm(null)}
-                      className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                      className="flex-1 md:flex-none rounded-lg border px-4 py-3 text-sm text-gray-600 hover:bg-gray-100"
                     >
                       Cancelar
                     </button>
@@ -857,7 +855,7 @@ export default function TreatmentsPage() {
               ) : (
                 <button
                   onClick={() => openAddPayment(plan.id)}
-                  className="rounded bg-black px-4 py-2 text-sm text-white"
+                  className="w-full rounded-lg bg-black px-4 py-3 text-sm text-white"
                 >
                   + Agregar Pago
                 </button>
