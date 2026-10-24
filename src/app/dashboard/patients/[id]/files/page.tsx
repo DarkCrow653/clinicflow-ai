@@ -216,7 +216,7 @@ export default function PatientFilesPage() {
     fileType.startsWith("image/")
 
   return (
-    <div className="space-y-6 p-10">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-10">
       <div>
         <Link
           href={`/dashboard/patients/${params.id}`}
@@ -231,7 +231,7 @@ export default function PatientFilesPage() {
       </div>
 
       {/* SUBIR ARCHIVO */}
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-4">
         <h2 className="text-lg font-bold">Subir archivo</h2>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

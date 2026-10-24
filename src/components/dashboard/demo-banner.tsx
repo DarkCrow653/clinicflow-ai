@@ -15,8 +15,8 @@ export default function DemoBanner() {
   if (!isDemo) return null
 
   return (
-    <div className="bg-black text-white text-xs text-center py-2 px-4">
-      👀 Estás viendo la demo de ClinicFlow — los datos son de ejemplo y se restauran periódicamente.
+    <div className="bg-black text-white text-[11px] sm:text-xs text-center py-2 px-3 leading-snug shrink-0">
+      👀 Demo con datos de ejemplo.
       <a href="/signup" className="ml-2 underline font-semibold">
         Crear cuenta gratis →
       </a>

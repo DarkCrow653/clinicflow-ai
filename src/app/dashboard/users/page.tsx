@@ -172,9 +172,9 @@ export default function UsersPage() {
   const totalReception = staff.filter((s) => s.role === "reception").length
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Usuarios</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Usuarios</h1>
         <p className="mt-2 text-gray-500">Gestiona el equipo de tu clínica.</p>
       </div>
 
@@ -203,7 +203,7 @@ export default function UsersPage() {
       </div>
 
       {/* INVITAR USUARIO */}
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-4">
         <h2 className="text-2xl font-bold">Invitar usuario</h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -250,7 +250,7 @@ export default function UsersPage() {
       </div>
 
       {/* EQUIPO ACTUAL */}
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">
             {activeFilter ? ROLE_LABELS[activeFilter] + "s" : "Equipo actual"}
@@ -320,7 +320,7 @@ export default function UsersPage() {
 
       {/* INVITACIONES PENDIENTES */}
       {invitations.length > 0 && (
-        <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Invitaciones pendientes</h2>
             <span className="text-sm text-gray-400">

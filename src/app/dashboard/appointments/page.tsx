@@ -289,14 +289,14 @@ export default function AppointmentsPage() {
   if (loading) return <AppointmentListSkeleton />
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Citas</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Citas</h1>
       </div>
 
       {/* FORMULARIO */}
       <DemoBlock>
-        <div className="space-y-4 rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="space-y-4 rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
         <h2 className="text-2xl font-bold">Nueva cita</h2>
 
         <div>
@@ -403,11 +403,11 @@ export default function AppointmentsPage() {
               {apts.map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between gap-4"
+                  className="rounded-2xl border bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                 >
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <p className="font-bold">{appointment.patients?.full_name}</p>
+                  <div className="flex items-start justify-between gap-3 sm:items-center sm:justify-start sm:gap-4">
+                    <div className="min-w-0">
+                      <p className="font-bold break-words">{appointment.patients?.full_name}</p>
                       <p className="text-sm text-gray-500">
                         {new Date(appointment.appointment_date).toLocaleTimeString("es-ES", {
                           hour: "2-digit",
@@ -421,25 +421,22 @@ export default function AppointmentsPage() {
                       )}
                     </div>
 
-                    <span className={`text-xs border rounded-full px-3 py-1 font-medium ${STATUS_STYLES[appointment.status]}`}>
+                    <span className={`shrink-0 text-xs border rounded-full px-3 py-1 font-medium ${STATUS_STYLES[appointment.status]}`}>
                       {STATUS_LABELS[appointment.status]}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <DemoBlock>
+                    <DemoBlock variant="inline">
                       <select
                         value={appointment.status}
                         onChange={(e) => updateStatus(appointment.id, e.target.value)}
-                        className="rounded border p-2 text-sm"
+                        className="min-w-0 flex-1 rounded border p-2 text-sm sm:flex-none"
                       >
                         {Object.entries(STATUS_LABELS).map(([value, label]) => (
                           <option key={value} value={value}>{label}</option>
                         ))}
                       </select>
-                    </DemoBlock>
-
-                    <DemoBlock>
                       <button
                         onClick={() => handleDeleteClick(appointment)}
                         className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition"

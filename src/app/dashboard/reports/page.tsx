@@ -122,15 +122,15 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Reportes</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Reportes</h1>
         <p className="mt-2 text-gray-500">Descarga la información de tu clínica en formato CSV.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
 
-        <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-3">
           <h2 className="text-lg font-bold">Pacientes</h2>
           <p className="text-sm text-gray-500">
             Nombre, teléfono, email y fecha de creación.
@@ -144,7 +144,7 @@ export default function ReportsPage() {
           </button>
         </div>
 
-        <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-3">
           <h2 className="text-lg font-bold">Citas</h2>
           <p className="text-sm text-gray-500">
             Paciente, fecha, estado y servicio.
@@ -158,7 +158,7 @@ export default function ReportsPage() {
           </button>
         </div>
 
-        <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-3">
           <h2 className="text-lg font-bold">Ingresos</h2>
           <p className="text-sm text-gray-500">
             Fecha, servicio e importe (solo citas completadas).

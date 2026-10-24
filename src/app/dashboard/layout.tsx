@@ -1,6 +1,7 @@
 import Sidebar from "@/components/dashboard/sidebar"
 import PlanBanner from "@/components/dashboard/plan-banner"
 import DemoBanner from "@/components/dashboard/demo-banner"
+import BottomNav from "@/components/dashboard/bottom-nav"
 
 export default function DashboardLayout({
   children,
@@ -19,13 +20,14 @@ export default function DashboardLayout({
           <Sidebar />
         </aside>
 
-        <main className="flex-1 overflow-y-auto flex flex-col">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col pb-20 md:pb-0">
           {/* Topbar móvil — solo visible en móvil */}
           <MobileTopbar />
           <PlanBanner />
           {children}
         </main>
       </div>
+      <BottomNav />
     </div>
   )
 }

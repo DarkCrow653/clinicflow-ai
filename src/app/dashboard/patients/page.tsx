@@ -167,9 +167,9 @@ export default function PatientsPage() {
   if (loading) return <PatientListSkeleton />
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Pacientes</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Pacientes</h1>
         {planId === "free" && (
           <p className="text-xs text-gray-400 mt-1">
             {patients.length}/{FREE_PATIENT_LIMIT} pacientes — Plan Free
@@ -185,7 +185,7 @@ export default function PatientsPage() {
       />
 
       <DemoBlock>
-        <div className="space-y-4 rounded-2xl border bg-white shadow-sm p-6">
+        <div className="space-y-4 rounded-2xl border bg-white shadow-sm p-4 sm:p-6">
         <h2 className="text-2xl font-bold">Nuevo Paciente</h2>
 
         <div>
@@ -244,15 +244,15 @@ export default function PatientsPage() {
           <p className="text-gray-400 text-sm">No se encontraron pacientes.</p>
         ) : (
           filteredPatients.map((patient) => (
-            <div key={patient.id} className="rounded-2xl border bg-white shadow-sm p-4 hover:bg-gray-50 flex items-center justify-between">
-              <Link href={`/dashboard/patients/${patient.id}`} className="flex-1">
-                <p className="font-bold">{patient.full_name}</p>
+            <div key={patient.id} className="rounded-2xl border bg-white shadow-sm p-4 hover:bg-gray-50 flex items-center justify-between gap-3">
+              <Link href={`/dashboard/patients/${patient.id}`} className="min-w-0 flex-1">
+                <p className="font-bold truncate">{patient.full_name}</p>
                 <p className="text-sm text-gray-500">{patient.phone}</p>
               </Link>
-              <DemoBlock>
+              <DemoBlock variant="inline">
                 <button
                   onClick={() => handleDeleteClick(patient)}
-                  className="rounded border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition ml-4"
+                  className="shrink-0 rounded border border-red-200 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition"
                 >
                   Eliminar
                 </button>

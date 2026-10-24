@@ -68,9 +68,9 @@ export default function ActivityPage() {
     })
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Auditoría</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Auditoría</h1>
         <p className="mt-2 text-gray-500">Historial de acciones en tu clínica.</p>
       </div>
 
@@ -92,7 +92,7 @@ export default function ActivityPage() {
       </div>
 
       {/* LISTA */}
-      <div className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
         {loading ? (
           <p className="text-gray-400 text-sm">Cargando...</p>
         ) : filteredLogs.length === 0 ? (

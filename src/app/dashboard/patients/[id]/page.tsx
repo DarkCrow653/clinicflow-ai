@@ -392,15 +392,15 @@ export default function PatientDetailPage() {
       year: "numeric",
     })
 
-  if (!patient) return <div className="p-10">Cargando...</div>
+  if (!patient) return <div className="p-4 sm:p-6 lg:p-10">Cargando...</div>
 
   const canSeeClinicalData = role === "admin" || role === "doctor"
 
   return (
-    <div className="space-y-6 p-10">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-10">
 
       {/* DATOS DEL PACIENTE */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm space-y-4">
         {isEditing ? (
           <div className="space-y-3">
             <div>
@@ -459,12 +459,12 @@ export default function PatientDetailPage() {
           </div>
         ) : (
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold">{patient.full_name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold break-words">{patient.full_name}</h1>
             <p className="text-gray-600">{patient.phone}</p>
             <p className="text-gray-600">{patient.email}</p>
 
             <div className="flex flex-wrap gap-2 mt-3">
-              <DemoBlock>
+              <DemoBlock variant="inline">
                 <button
                   onClick={() => setIsEditing(true)}
                   className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
@@ -474,17 +474,17 @@ export default function PatientDetailPage() {
               </DemoBlock>
 
               {canSeeClinicalData && (
-                <>
-                  <Link href={`/dashboard/patients/${patient.id}/odontogram`} className="rounded border px-4 py-2 text-sm hover:bg-gray-50">
+                <div className="grid w-full grid-cols-3 gap-2 sm:contents">
+                  <Link href={`/dashboard/patients/${patient.id}/odontogram`} className="rounded border px-3 py-3 text-center text-sm hover:bg-gray-50 sm:px-4 sm:py-2">
                     🦷 Odontograma
                   </Link>
-                  <Link href={`/dashboard/patients/${patient.id}/treatments`} className="rounded border px-4 py-2 text-sm hover:bg-gray-50">
+                  <Link href={`/dashboard/patients/${patient.id}/treatments`} className="rounded border px-3 py-3 text-center text-sm hover:bg-gray-50 sm:px-4 sm:py-2">
                     📋 Tratamientos
                   </Link>
-                  <Link href={`/dashboard/patients/${patient.id}/files`} className="rounded border px-4 py-2 text-sm hover:bg-gray-50">
+                  <Link href={`/dashboard/patients/${patient.id}/files`} className="rounded border px-3 py-3 text-center text-sm hover:bg-gray-50 sm:px-4 sm:py-2">
                     📁 Archivos
                   </Link>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -493,9 +493,9 @@ export default function PatientDetailPage() {
 
       {/* 👇 NUEVO — RESUMEN EJECUTIVO */}
       {canSeeClinicalData && (
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {/* Próxima cita */}
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border bg-white p-4 shadow-sm col-span-2 md:col-span-1">
             <p className="text-xs text-gray-500">Próxima cita</p>
             {nextAppointment ? (
               <>
@@ -519,13 +519,13 @@ export default function PatientDetailPage() {
           {/* Tratamientos activos */}
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs text-gray-500">Tratamientos activos</p>
-            <p className="text-3xl font-bold mt-1">{activeTreatments.length}</p>
+            <p className="text-2xl sm:text-3xl font-bold mt-1">{activeTreatments.length}</p>
           </div>
 
           {/* Saldo pendiente */}
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs text-gray-500">Saldo pendiente</p>
-            <p className={`text-3xl font-bold mt-1 ${totalPending > 0 ? "text-red-600" : "text-green-600"}`}>
+            <p className={`text-2xl sm:text-3xl font-bold mt-1 ${totalPending > 0 ? "text-red-600" : "text-green-600"}`}>
               ${totalPending}
             </p>
           </div>
@@ -533,7 +533,7 @@ export default function PatientDetailPage() {
           {/* Archivos */}
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <p className="text-xs text-gray-500">Archivos clínicos</p>
-            <p className="text-3xl font-bold mt-1">{fileCount}</p>
+            <p className="text-2xl sm:text-3xl font-bold mt-1">{fileCount}</p>
             <Link href={`/dashboard/patients/${patient.id}/files`} className="text-xs text-gray-400 hover:text-black">
               Ver archivos →
             </Link>
@@ -543,7 +543,7 @@ export default function PatientDetailPage() {
 
       {/* 👇 NUEVO — TRATAMIENTOS ACTIVOS */}
       {canSeeClinicalData && activeTreatments.length > 0 && (
-        <div className="rounded-2xl bg-white p-6 shadow-sm space-y-3">
+        <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">Tratamientos Activos</h2>
             <Link href={`/dashboard/patients/${patient.id}/treatments`} className="text-xs text-gray-400 hover:text-black">
@@ -586,7 +586,7 @@ export default function PatientDetailPage() {
 
       {/* HISTORIAL CLÍNICO */}
       {canSeeClinicalData && (
-        <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-2xl bg-white p-4 sm:p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Historial Clínico</h2>
             <DemoBlock>
@@ -707,12 +707,10 @@ export default function PatientDetailPage() {
                       Consulta {formatDate(record.consultation_date)}
                     </span>
                     <div className="flex items-center gap-3">
-                      <DemoBlock>
+                      <DemoBlock variant="inline">
                         <button onClick={() => openEditForm(record)} className="text-xs text-gray-500 hover:text-black">
                           Editar
                         </button>
-                      </DemoBlock>
-                      <DemoBlock>
                         <button onClick={() => deleteRecord(record.id, record.consultation_date)} className="text-xs text-red-400 hover:text-red-600">
                           Eliminar
                         </button>

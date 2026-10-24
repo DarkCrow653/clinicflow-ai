@@ -217,15 +217,15 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Servicios</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Servicios</h1>
         <p className="mt-2 text-gray-500">Define los servicios y precios de tu clínica.</p>
       </div>
 
       {/* FORMULARIO NUEVO SERVICIO */}
       <DemoBlock>
-        <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-4">
         <h2 className="text-2xl font-bold">Nuevo servicio</h2>
 
         {/* NOMBRE */}
@@ -370,18 +370,16 @@ export default function ServicesPage() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <DemoBlock>
+                    <DemoBlock variant="inline">
                       <button
                         onClick={() => startEdit(service)}
-                        className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
+                        className="rounded border px-3 py-2 text-sm hover:bg-gray-50"
                       >
                         Editar
                       </button>
-                    </DemoBlock>
-                    <DemoBlock>
                       <button
                         onClick={() => deleteService(service.id)}
-                        className="rounded border border-red-200 px-3 py-1 text-sm text-red-500 hover:bg-red-50"
+                        className="rounded border border-red-200 px-3 py-2 text-sm text-red-500 hover:bg-red-50"
                       >
                         Eliminar
                       </button>

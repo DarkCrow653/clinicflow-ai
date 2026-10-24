@@ -135,7 +135,8 @@ export default function OdontogramPage() {
       <button
         key={toothNumber}
         onClick={() => selectTooth(toothNumber)}
-        className={`flex h-14 w-12 flex-col items-center justify-center rounded-lg border-2 text-xs font-semibold transition hover:scale-105 ${colorClass}`}
+        aria-label={`Pieza ${toothNumber}`}
+        className={`flex h-11 w-full min-w-0 flex-col items-center justify-center rounded-lg border-2 text-xs font-semibold transition active:scale-95 sm:h-14 sm:w-12 sm:hover:scale-105 ${selectedTooth === toothNumber ? "ring-2 ring-black ring-offset-1" : ""} ${colorClass}`}
       >
         <span>{toothNumber}</span>
       </button>
@@ -143,7 +144,7 @@ export default function OdontogramPage() {
   }
 
   return (
-    <div className="space-y-6 p-10">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-10">
       <div className="flex items-center justify-between">
         <div>
           <Link href={`/dashboard/patients/${params.id}`} className="text-sm text-gray-400 hover:text-black">
@@ -156,12 +157,12 @@ export default function OdontogramPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
 
         {/* ODONTOGRAMA */}
-        <div className="rounded-2xl border bg-white p-8 shadow-sm space-y-8">
+        <div className="rounded-2xl border bg-white p-3 sm:p-8 shadow-sm space-y-6 sm:space-y-8">
 
           {/* Arcada superior */}
           <div>
             <p className="text-xs text-gray-400 mb-2 text-center">Arcada superior</p>
-            <div className="flex justify-center gap-1 flex-wrap">
+            <div className="grid grid-cols-8 gap-1 sm:flex sm:justify-center sm:flex-wrap">
               {UPPER_ROW.map(renderTooth)}
             </div>
           </div>
@@ -170,14 +171,14 @@ export default function OdontogramPage() {
 
           {/* Arcada inferior */}
           <div>
-            <div className="flex justify-center gap-1 flex-wrap">
+            <div className="grid grid-cols-8 gap-1 sm:flex sm:justify-center sm:flex-wrap">
               {LOWER_ROW.map(renderTooth)}
             </div>
             <p className="text-xs text-gray-400 mt-2 text-center">Arcada inferior</p>
           </div>
 
           {/* Leyenda */}
-          <div className="flex flex-wrap gap-3 pt-4 border-t">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-4 border-t sm:flex sm:flex-wrap">
             {STATUS_OPTIONS.map((opt) => (
               <div key={opt.value} className="flex items-center gap-2 text-xs text-gray-600">
                 <span className={`inline-block h-3 w-3 rounded-full border-2 ${STATUS_COLORS[opt.value]}`} />
@@ -188,7 +189,16 @@ export default function OdontogramPage() {
         </div>
 
         {/* PANEL LATERAL */}
-        <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4 h-fit">
+        {selectedTooth !== null && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+            onClick={() => setSelectedTooth(null)}
+          />
+        )}
+        <div className={selectedTooth !== null
+          ? "fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl space-y-4 lg:static lg:z-auto lg:max-h-none lg:rounded-2xl lg:border lg:p-6 lg:pb-6 lg:shadow-sm lg:h-fit"
+          : "rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-4 h-fit"
+        }>
           {selectedTooth === null ? (
             <p className="text-gray-400 text-sm">
               Selecciona una pieza dental para ver o editar su estado.
@@ -203,7 +213,7 @@ export default function OdontogramPage() {
               <div>
                 <label className="text-xs text-gray-500">Estado</label>
                 <select
-                  className="w-full rounded border p-2 text-sm mt-1"
+                  className="w-full rounded border p-3 text-base mt-1 sm:p-2 sm:text-sm"
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value)}
                 >
@@ -234,13 +244,13 @@ export default function OdontogramPage() {
                 <button
                   onClick={saveTooth}
                   disabled={saving}
-                  className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                  className="flex-1 rounded bg-black px-4 py-3 text-sm text-white disabled:opacity-50 sm:flex-none sm:py-2"
                 >
                   {saving ? "Guardando..." : "Guardar"}
                 </button>
                 <button
                   onClick={() => setSelectedTooth(null)}
-                  className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  className="flex-1 rounded border px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 sm:flex-none sm:py-2"
                 >
                   Cerrar
                 </button>

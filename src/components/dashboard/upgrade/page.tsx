@@ -28,9 +28,9 @@ export default function UpgradePage() {
   const { plan, isFree } = usePlan()
 
   return (
-    <div className="space-y-8 p-10 max-w-4xl mx-auto">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-4xl font-bold">Planes</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Planes</h1>
         <p className="mt-2 text-gray-500">
           Plan actual: <span className="font-semibold text-black">{plan?.name || "Free"}</span>
         </p>
@@ -38,7 +38,7 @@ export default function UpgradePage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* FREE */}
-        <div className={`rounded-2xl border p-8 space-y-6 ${isFree ? "border-black" : "border-gray-200"}`}>
+        <div className={`rounded-2xl border p-4 sm:p-8 space-y-6 ${isFree ? "border-black" : "border-gray-200"}`}>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-xl font-bold">Free</h3>
@@ -71,7 +71,7 @@ export default function UpgradePage() {
         </div>
 
         {/* PRO */}
-        <div className="rounded-2xl border-2 border-black p-8 space-y-6 relative">
+        <div className="rounded-2xl border-2 border-black p-4 sm:p-8 space-y-6 relative">
           <div className="absolute -top-3 left-6">
             <span className="rounded-full bg-black text-white text-xs px-3 py-1 font-medium">
               Recomendado

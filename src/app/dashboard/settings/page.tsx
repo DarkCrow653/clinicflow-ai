@@ -69,15 +69,15 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Configuración</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold">Configuración</h1>
         <p className="mt-2 text-gray-500">
           Estos datos aparecerán en los presupuestos y documentos generados.
         </p>
       </div>
 
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-4 max-w-xl">
+      <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-4 max-w-xl">
         <div>
           <label className="text-xs text-gray-500">Nombre de la clínica</label>
           <input
@@ -97,7 +97,7 @@ export default function SettingsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-gray-500">Teléfono</label>
             <input

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Menu, X, ArrowLeft, LogOut, LayoutDashboard, Users, CalendarDays, Stethoscope, Users2, ScrollText, FileSpreadsheet, Settings, Zap } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { OPEN_MOBILE_MENU_EVENT } from "@/components/dashboard/bottom-nav"
 
 const allLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "doctor", "reception"] },
@@ -33,6 +34,12 @@ export default function MobileTopbar() {
         if (data) setRole(data.role)
       })
     })
+  }, [])
+
+  useEffect(() => {
+    const open = () => setIsOpen(true)
+    window.addEventListener(OPEN_MOBILE_MENU_EVENT, open)
+    return () => window.removeEventListener(OPEN_MOBILE_MENU_EVENT, open)
   }, [])
 
   // Cierra el menú al navegar

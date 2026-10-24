@@ -331,10 +331,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 p-10">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-10">
       <div>
-        <h1 className="text-4xl font-bold">Dashboard</h1>
-        <p className="mt-2 text-xl">Clínica: {clinicName}</p>
+        <h1 className="text-2xl sm:text-4xl font-bold">Dashboard</h1>
+        <p className="mt-1 text-base sm:text-xl text-gray-600">Clínica: {clinicName}</p>
       </div>
 
       {tomorrowAppointments.length > 0 && (
@@ -356,16 +356,16 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
           <p className="text-gray-500">Pacientes</p>
           <h2 className="mt-2 text-4xl font-bold">{totalPatients}</h2>
         </div>
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
           <p className="text-gray-500">Total citas</p>
           <h2 className="mt-2 text-4xl font-bold">{totalAppointments}</h2>
         </div>
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
           <p className="text-gray-500">Citas hoy</p>
           <h2 className="mt-2 text-4xl font-bold">{todayAppointments.length}</h2>
         </div>
@@ -373,30 +373,30 @@ export default function DashboardPage() {
 
       {isAdmin && (
         <>
-          <div className="grid gap-6 md:grid-cols-4">
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-4 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <p className="text-gray-500 text-sm">Ingresos hoy</p>
-              <h2 className="mt-2 text-3xl font-bold">${incomeToday}</h2>
+              <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">${incomeToday}</h2>
               <p className="text-xs text-gray-400 mt-1">Citas + tratamientos completados</p>
             </div>
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <p className="text-gray-500 text-sm">Ingresos del mes</p>
-              <h2 className="mt-2 text-3xl font-bold">${incomeMonth}</h2>
+              <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">${incomeMonth}</h2>
               <p className="text-xs text-gray-400 mt-1">Citas + tratamientos completados</p>
             </div>
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <p className="text-gray-500 text-sm">Tasa de cancelación</p>
-              <h2 className="mt-2 text-3xl font-bold">{cancellationRate}%</h2>
+              <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{cancellationRate}%</h2>
               <p className="text-xs text-gray-400 mt-1">Del total de citas</p>
             </div>
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <p className="text-gray-500 text-sm">Pacientes nuevos</p>
-              <h2 className="mt-2 text-3xl font-bold">{newPatientsMonth}</h2>
+              <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{newPatientsMonth}</h2>
               <p className="text-xs text-gray-400 mt-1">Este mes</p>
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
             <h2 className="text-xl font-bold mb-4">Servicios más vendidos</h2>
             {topServices.length === 0 ? (
               <p className="text-gray-400 text-sm">Aún no hay citas completadas con servicio asignado.</p>
@@ -418,41 +418,41 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <h2 className="text-xl font-bold">Centro de Control Dental</h2>
 
-            <div className="grid gap-6 md:grid-cols-4">
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-4 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
                 <p className="text-gray-500 text-sm">Pacientes Activos</p>
-                <h2 className="mt-2 text-3xl font-bold">{activePatientsCount}</h2>
+                <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{activePatientsCount}</h2>
                 <p className="text-xs text-gray-400 mt-1">Últimos 12 meses</p>
               </div>
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
                 <p className="text-gray-500 text-sm">Tratamientos Activos</p>
-                <h2 className="mt-2 text-3xl font-bold">{activeTreatmentsCount}</h2>
+                <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{activeTreatmentsCount}</h2>
                 <p className="text-xs text-gray-400 mt-1">Borrador o en curso</p>
               </div>
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
                 <p className="text-gray-500 text-sm">Ingresos del Mes</p>
-                <h2 className="mt-2 text-3xl font-bold">${monthlyPaymentIncome}</h2>
+                <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">${monthlyPaymentIncome}</h2>
                 <p className="text-xs text-gray-400 mt-1">Pagos cobrados</p>
               </div>
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
                 <p className="text-gray-500 text-sm">Saldo Pendiente</p>
-                <h2 className="mt-2 text-3xl font-bold text-red-600">${pendingBalanceTotal}</h2>
+                <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-red-600">${pendingBalanceTotal}</h2>
                 <p className="text-xs text-gray-400 mt-1">De tratamientos activos</p>
               </div>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-3">
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
                 <p className="text-gray-500 text-sm">Tratamientos Completados</p>
-                <h2 className="mt-2 text-3xl font-bold">{completedTreatmentsCount}</h2>
+                <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{completedTreatmentsCount}</h2>
               </div>
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
                 <p className="text-gray-500 text-sm">Tratamientos Pendientes</p>
-                <h2 className="mt-2 text-3xl font-bold">{activeTreatmentsCount}</h2>
+                <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">{activeTreatmentsCount}</h2>
               </div>
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
                 <p className="text-gray-500 text-sm">Tasa de Finalización</p>
-                <h2 className="mt-2 text-3xl font-bold">
+                <h2 className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">
                   {completedTreatmentsCount + activeTreatmentsCount > 0
                     ? Math.round((completedTreatmentsCount / (completedTreatmentsCount + activeTreatmentsCount)) * 100)
                     : 0}%
@@ -460,7 +460,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <h3 className="text-lg font-bold mb-4">Resumen Financiero</h3>
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div>
@@ -482,7 +482,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <h3 className="text-lg font-bold mb-4">Top Tratamientos</h3>
               {topTreatments.length === 0 ? (
                 <p className="text-gray-400 text-sm">Aún no hay procedimientos completados.</p>
@@ -504,7 +504,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <h3 className="text-lg font-bold mb-4">Próximas Citas</h3>
               {upcomingAppointments.length === 0 ? (
                 <p className="text-gray-400 text-sm">No hay próximas citas programadas.</p>
@@ -529,7 +529,7 @@ export default function DashboardPage() {
             </div>
 
             {alerts.length > 0 && (
-              <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
+              <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm space-y-3">
                 <h3 className="text-lg font-bold">Alertas</h3>
                 {alerts.map((alert, i) => (
                   <div
@@ -546,7 +546,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
               <h3 className="text-lg font-bold mb-4">Actividad Reciente</h3>
               {recentActivity.length === 0 ? (
                 <p className="text-gray-400 text-sm">No hay actividad registrada aún.</p>
@@ -571,7 +571,7 @@ export default function DashboardPage() {
         </>
       )}
 
-      <div className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
         <h2 className="text-xl font-bold mb-4">Citas de hoy</h2>
         {todayAppointments.length === 0 ? (
           <p className="text-gray-400 text-sm">No hay citas programadas para hoy.</p>
